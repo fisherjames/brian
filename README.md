@@ -16,6 +16,8 @@ A local-first project management system designed for AI agents. One command crea
 
 [Quick Start](#-quick-start) · [The Problem](#-the-problem) · [How It Works](#-how-it-works) · [Commands](#-commands) · [Workflow](#-the-workflow) · [Contributing](CONTRIBUTING.md)
 
+<img src="docs/screenshots/demo-brain.png" alt="BrainTree OS - Brain viewer" width="756" />
+
 </div>
 
 ---
@@ -60,6 +62,8 @@ Open Claude Code in any project directory and run:
 ```
 
 An interactive wizard asks about your project and generates a complete brain structure: departments, execution plan, agent personas, templates, and more.
+
+<img src="docs/screenshots/claude-wizard.png" alt="BrainTree OS - Init wizard in Claude Code" width="756" />
 
 ### 3. Start working
 
