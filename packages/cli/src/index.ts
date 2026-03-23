@@ -33,6 +33,14 @@ type BrainMeta = {
   version: string
 }
 
+type BrainStep = {
+  id: string
+  phase: number
+  title: string
+  status: 'not_started' | 'in_progress' | 'completed' | 'blocked'
+  dependencies: string[]
+}
+
 function ensureConfigDir() {
   fs.mkdirSync(CONFIG_DIR, { recursive: true })
   if (!fs.existsSync(BRAINS_JSON)) {
@@ -183,6 +191,258 @@ function detectScripts(brainRoot: string): string[] {
   } catch {
     return []
   }
+}
+
+function slugify(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
+function findMarkdownFiles(root: string): string[] {
+  const files: string[] = []
+
+  function walk(dir: string) {
+    let entries: fs.Dirent[]
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true })
+    } catch {
+      return
+    }
+
+    for (const entry of entries) {
+      if (entry.name === 'node_modules') continue
+      if (entry.name.startsWith('.')) continue
+
+      const fullPath = path.join(dir, entry.name)
+      if (entry.isDirectory()) {
+        walk(fullPath)
+      } else if (entry.isFile() && entry.name.endsWith('.md')) {
+        files.push(fullPath)
+      }
+    }
+  }
+
+  walk(root)
+  return files
+}
+
+function findExecutionPlanPath(brainRoot: string): string | null {
+  const directCandidates = [
+    path.join(brainRoot, 'Execution-Plan.md'),
+    path.join(brainRoot, 'Execution-Plan', 'Execution-Plan.md'),
+    path.join(brainRoot, 'Execution_Plan', 'Execution_Plan.md'),
+  ]
+
+  for (const candidate of directCandidates) {
+    if (fs.existsSync(candidate)) return candidate
+  }
+
+  const matches = findMarkdownFiles(brainRoot).filter(file => {
+    const lower = path.basename(file).toLowerCase()
+    return lower === 'execution-plan.md' || lower === 'execution_plan.md'
+  })
+
+  return matches[0] ?? null
+}
+
+function normalizeStatus(raw: string): BrainStep['status'] {
+  const value = raw.trim().toLowerCase().replace(/\s+/g, '_')
+  if (value.startsWith('complete')) return 'completed'
+  if (value.startsWith('in_progress') || value.startsWith('in-progress') || value.startsWith('inprogress')) {
+    return 'in_progress'
+  }
+  if (value.startsWith('blocked')) return 'blocked'
+  return 'not_started'
+}
+
+function parseDependencies(raw: string): string[] {
+  if (!raw || raw.trim().toLowerCase() === 'none') return []
+  return raw
+    .split(',')
+    .map(part => part.trim())
+    .filter(Boolean)
+}
+
+function parseExecutionPlanSteps(content: string): BrainStep[] {
+  const steps: BrainStep[] = []
+  const lines = content.split('\n')
+  let currentPhase = 0
+  let current: BrainStep | null = null
+  let phaseStepCounter = 0
+
+  function pushCurrent() {
+    if (current) {
+      steps.push(current)
+      current = null
+    }
+  }
+
+  for (const line of lines) {
+    const phaseMatch = line.match(/^##\s+Phase\s+(\d+)/i)
+    if (phaseMatch) {
+      pushCurrent()
+      currentPhase = Number(phaseMatch[1])
+      phaseStepCounter = 0
+      continue
+    }
+
+    const explicitStepMatch = line.match(/^#{2,5}\s+Step\s+([\d.]+[a-z]?)\s*:\s*(.+)$/i)
+    if (explicitStepMatch) {
+      pushCurrent()
+      current = {
+        id: explicitStepMatch[1],
+        phase: currentPhase,
+        title: explicitStepMatch[2].trim(),
+        status: 'not_started',
+        dependencies: [],
+      }
+      continue
+    }
+
+    const headingMatch = line.match(/^###\s+(.+)$/)
+    if (headingMatch) {
+      pushCurrent()
+      const heading = headingMatch[1].trim()
+      const prefixedMatch = heading.match(/^([A-Za-z]+-\d+(?:\.\d+)?)\s+(.*)$/)
+      const numberedMatch = heading.match(/^(\d+(?:\.\d+)?)\s+(.*)$/)
+      phaseStepCounter += 1
+
+      current = {
+        id: prefixedMatch?.[1] ?? numberedMatch?.[1] ?? `${currentPhase}.${phaseStepCounter}`,
+        phase: currentPhase,
+        title: (prefixedMatch?.[2] ?? numberedMatch?.[2] ?? heading).trim(),
+        status: 'not_started',
+        dependencies: [],
+      }
+      continue
+    }
+
+    if (!current) continue
+
+    const statusMatch = line.match(/^-+\s+\*\*Status\*\*:\s*(.+)$/i)
+    if (statusMatch) {
+      current.status = normalizeStatus(statusMatch[1])
+      continue
+    }
+
+    const dependencyMatch = line.match(/^-+\s+\*\*Dependencies\*\*:\s*(.+)$/i)
+    if (dependencyMatch) {
+      current.dependencies = parseDependencies(dependencyMatch[1])
+    }
+  }
+
+  pushCurrent()
+  return steps
+}
+
+function readExecutionPlanSteps(brainRoot: string): { path: string; steps: BrainStep[] } | null {
+  const executionPlanPath = findExecutionPlanPath(brainRoot)
+  if (!executionPlanPath) return null
+
+  try {
+    const content = fs.readFileSync(executionPlanPath, 'utf8')
+    return { path: executionPlanPath, steps: parseExecutionPlanSteps(content) }
+  } catch {
+    return null
+  }
+}
+
+function resolveFolderContext(
+  brainRoot: string,
+  candidates: Array<{ dir: string; index: string; name: string }>
+): { dir: string; indexPath: string; indexName: string } | null {
+  for (const candidate of candidates) {
+    const indexPath = path.join(brainRoot, candidate.dir, candidate.index)
+    if (fs.existsSync(indexPath)) {
+      return {
+        dir: path.dirname(indexPath),
+        indexPath,
+        indexName: candidate.name,
+      }
+    }
+  }
+  return null
+}
+
+function ensureLinkedNote(
+  directory: string,
+  indexPath: string,
+  indexName: string,
+  fileName: string,
+  title: string,
+  body: string
+): string {
+  const notePath = path.join(directory, fileName)
+
+  writeFileIfMissing(
+    notePath,
+    `# ${title}\n\n> Part of [[${indexName}]]\n\n${body.trim()}\n`
+  )
+
+  updateFileIfExists(indexPath, content => {
+    const link = `- [[${fileName.replace('.md', '')}]]`
+    return content.includes(link) ? content : `${content.trimEnd()}\n${link}\n`
+  })
+
+  return notePath
+}
+
+function printSteps(label: string, steps: BrainStep[]) {
+  if (steps.length === 0) return
+  console.log(`  ${label}:`)
+  for (const step of steps) {
+    console.log(`  - ${step.id}: ${step.title}`)
+  }
+  console.log('')
+}
+
+function updateExecutionPlanStepStatus(executionPlanPath: string, stepId: string, status: BrainStep['status']) {
+  updateFileIfExists(executionPlanPath, content => {
+    const lines = content.split('\n')
+    let inTarget = false
+    let updated = false
+
+    for (let i = 0; i < lines.length; i += 1) {
+      const explicit = lines[i].match(/^#{2,5}\s+Step\s+([\d.]+[a-z]?)\s*:/i)
+      const prefixed = lines[i].match(/^###\s+([A-Za-z]+-\d+(?:\.\d+)?)\s+/)
+      const numbered = lines[i].match(/^###\s+(\d+(?:\.\d+)?)\s+/)
+
+      if (explicit || prefixed || numbered) {
+        const candidateId = explicit?.[1] ?? prefixed?.[1] ?? numbered?.[1] ?? ''
+        inTarget = candidateId === stepId
+      }
+
+      if (inTarget && lines[i].match(/^-+\s+\*\*Status\*\*:/i)) {
+        lines[i] = `- **Status**: ${status}`
+        updated = true
+        inTarget = false
+      }
+    }
+
+    return updated ? `${lines.join('\n')}\n` : content
+  })
+}
+
+function commandPromptSummary(brainRoot: string) {
+  console.log(`  Brain root: ${brainRoot}`)
+  console.log('  Codex slash commands you can use inside the chat:')
+  console.log('  - /init      Generate or refresh AGENTS.md instructions')
+  console.log('  - /plan      Switch the current chat into planning mode')
+  console.log('  - /resume    Resume an old Codex conversation transcript')
+  console.log('  - /status    Show Codex session configuration and token usage')
+  console.log('')
+  console.log('  BrainTree workflow commands live in the shell:')
+  console.log('  - brain-tree-os init')
+  console.log('  - brain-tree-os resume')
+  console.log('  - brain-tree-os wrap-up')
+  console.log('  - brain-tree-os status')
+  console.log('  - brain-tree-os plan <step>')
+  console.log('  - brain-tree-os sprint')
+  console.log('  - brain-tree-os sync')
+  console.log('  - brain-tree-os feature <name>')
+  console.log('')
 }
 
 function createBrainScaffold(brainRoot: string, name: string, description: string): BrainMeta {
@@ -664,7 +924,8 @@ function showWelcome(port: number) {
   console.log('  |  1. Open that project in a terminal                         |')
   console.log('  |  2. Run: brain-tree-os init                                 |')
   console.log('  |  3. Open Codex in the project                               |')
-  console.log('  |  4. Run: brain-tree-os resume                               |')
+  console.log('  |  4. Optional in Codex: /init or /plan                       |')
+  console.log('  |  5. Run: brain-tree-os resume                               |')
   console.log('  |                                                             |')
   console.log('  |  The brain will appear in the viewer automatically.         |')
   console.log('  +-------------------------------------------------------------+')
@@ -683,6 +944,11 @@ function showHelp() {
     brain-tree-os resume            Show the files to read before working
     brain-tree-os wrap-up           Create the next handoff template
     brain-tree-os status            Show the current brain or all registered brains
+    brain-tree-os plan [step]       Create a step plan note for an execution-plan step
+    brain-tree-os sprint            Create a sprint note from ready and in-progress work
+    brain-tree-os sync              Scan the brain for broken links and disconnected files
+    brain-tree-os feature <name>    Create a feature spec note inside the brain
+    brain-tree-os codex             Show the Codex slash-command mapping for BrainTree
     brain-tree-os help              Show this help
 
   Viewer options:
@@ -837,6 +1103,233 @@ async function main() {
     const handoffPath = createWrapUp(brainRoot)
     console.log(`  Created handoff template: ${handoffPath}`)
     console.log('  Fill it in, then update Execution-Plan.md before ending the session.')
+    return
+  }
+
+  if (command === 'plan') {
+    const brainRoot = findBrainRoot(process.cwd())
+    if (!brainRoot) {
+      console.log('  No brain found in this directory tree.')
+      console.log('  Run `brain-tree-os init` first.')
+      return
+    }
+
+    const executionPlan = readExecutionPlanSteps(brainRoot)
+    if (!executionPlan || executionPlan.steps.length === 0) {
+      console.log('  No parseable execution plan found.')
+      console.log('  Keep using Codex `/plan`, but add an Execution-Plan.md if you want BrainTree step planning.')
+      return
+    }
+
+    const stepArg = args[0]
+    const completedIds = new Set(
+      executionPlan.steps.filter(step => step.status === 'completed').map(step => step.id)
+    )
+    const readySteps = executionPlan.steps.filter(step => {
+      if (step.status !== 'not_started') return false
+      return step.dependencies.every(dep => completedIds.has(dep))
+    })
+    const inProgressSteps = executionPlan.steps.filter(step => step.status === 'in_progress')
+
+    if (!stepArg) {
+      console.log('')
+      printSteps('In progress', inProgressSteps)
+      printSteps('Ready to plan', readySteps)
+      console.log('  Next:')
+      console.log('  - Run `brain-tree-os plan <step-id>` to create a linked plan note.')
+      console.log('  - In Codex, use `/plan` for the conversation-level planning pass.')
+      console.log('')
+      return
+    }
+
+    const step = executionPlan.steps.find(candidate => candidate.id.toLowerCase() === stepArg.toLowerCase())
+    if (!step) {
+      console.log(`  Step not found: ${stepArg}`)
+      return
+    }
+
+    const operations = resolveFolderContext(brainRoot, [
+      { dir: '03_Operations', index: 'Operations.md', name: 'Operations' },
+      { dir: '04_Operations', index: 'Operations.md', name: 'Operations' },
+      { dir: 'Operations', index: 'Operations.md', name: 'Operations' },
+    ])
+
+    if (!operations) {
+      console.log('  No Operations index found to attach the plan note.')
+      return
+    }
+
+    const fileName = `Plan-${slugify(step.id)}.md`
+    const planPath = ensureLinkedNote(
+      operations.dir,
+      operations.indexPath,
+      operations.indexName,
+      fileName,
+      `Plan ${step.id}`,
+      `## Step\n- **ID**: ${step.id}\n- **Title**: ${step.title}\n- **Phase**: ${step.phase}\n- **Dependencies**: ${step.dependencies.length > 0 ? step.dependencies.join(', ') : 'none'}\n\n## Goal\n${step.title}\n\n## Suggested Codex Prompt\nUse \`/plan\` in Codex with this request:\n\n\`/plan Propose an implementation plan for ${step.id}: ${step.title}. Read BRAIN-INDEX.md, AGENTS.md, Execution-Plan.md, and this note first.\`\n\n## Tasks\n- [ ] Inspect the relevant notes and code paths\n- [ ] Break the work into concrete changes\n- [ ] Decide verification before editing\n- [ ] Record decisions and risks\n\n## Verification\n- Add the exact checks to run before execution starts.\n`
+    )
+
+    updateExecutionPlanStepStatus(executionPlan.path, step.id, 'in_progress')
+
+    console.log(`  Created step plan: ${planPath}`)
+    console.log('  Next in Codex: run `/plan` and reference this note plus Execution-Plan.md.')
+    return
+  }
+
+  if (command === 'sprint') {
+    const brainRoot = findBrainRoot(process.cwd())
+    if (!brainRoot) {
+      console.log('  No brain found in this directory tree.')
+      console.log('  Run `brain-tree-os init` first.')
+      return
+    }
+
+    const executionPlan = readExecutionPlanSteps(brainRoot)
+    if (!executionPlan || executionPlan.steps.length === 0) {
+      console.log('  No parseable execution plan found.')
+      return
+    }
+
+    const completedIds = new Set(
+      executionPlan.steps.filter(step => step.status === 'completed').map(step => step.id)
+    )
+    const inProgress = executionPlan.steps.filter(step => step.status === 'in_progress')
+    const ready = executionPlan.steps.filter(step => {
+      if (step.status !== 'not_started') return false
+      return step.dependencies.every(dep => completedIds.has(dep))
+    })
+
+    const operations = resolveFolderContext(brainRoot, [
+      { dir: '03_Operations', index: 'Operations.md', name: 'Operations' },
+      { dir: '04_Operations', index: 'Operations.md', name: 'Operations' },
+      { dir: 'Operations', index: 'Operations.md', name: 'Operations' },
+    ])
+
+    if (!operations) {
+      console.log('  No Operations index found to attach the sprint note.')
+      return
+    }
+
+    const dateStamp = new Date().toISOString().slice(0, 10)
+    const fileName = `Sprint-${dateStamp}.md`
+    const sprintPath = ensureLinkedNote(
+      operations.dir,
+      operations.indexPath,
+      operations.indexName,
+      fileName,
+      `Sprint ${dateStamp}`,
+      `## Current Focus\n${inProgress.length > 0 ? inProgress.map(step => `- [ ] ${step.id}: ${step.title}`).join('\n') : '- No in-progress steps'}\n\n## Ready Queue\n${ready.length > 0 ? ready.slice(0, 5).map(step => `- [ ] ${step.id}: ${step.title}`).join('\n') : '- No unblocked steps ready'}\n\n## Suggested Codex Prompt\nUse \`/plan\` in Codex with:\n\n\`/plan Propose a one-week sprint using this sprint note, Execution-Plan.md, AGENTS.md, and the latest handoff.\`\n`
+    )
+
+    console.log(`  Created sprint note: ${sprintPath}`)
+    console.log('  Next in Codex: run `/plan` to refine the sprint inside the active chat.')
+    return
+  }
+
+  if (command === 'feature') {
+    const brainRoot = findBrainRoot(process.cwd())
+    if (!brainRoot) {
+      console.log('  No brain found in this directory tree.')
+      console.log('  Run `brain-tree-os init` first.')
+      return
+    }
+
+    const featureName = args.join(' ').trim()
+    if (!featureName) {
+      console.log('  Usage: brain-tree-os feature <name>')
+      return
+    }
+
+    const product = resolveFolderContext(brainRoot, [
+      { dir: '01_Product', index: 'Product.md', name: 'Product' },
+      { dir: '00_Vision', index: 'Vision.md', name: 'Vision' },
+      { dir: 'Product', index: 'Product.md', name: 'Product' },
+      { dir: 'Vision', index: 'Vision.md', name: 'Vision' },
+    ])
+
+    if (!product) {
+      console.log('  No Product or Vision index found to attach the feature spec.')
+      return
+    }
+
+    const fileName = `Feature-${slugify(featureName)}.md`
+    const featurePath = ensureLinkedNote(
+      product.dir,
+      product.indexPath,
+      product.indexName,
+      fileName,
+      `Feature ${featureName}`,
+      `## Status\nPlanning\n\n## Summary\nDescribe the user-facing behavior for ${featureName}.\n\n## Motivation\nWhy this feature matters.\n\n## Requirements\n- [ ] Add the concrete requirements here\n- [ ] Link the relevant notes and code paths\n\n## Suggested Codex Prompt\nUse \`/plan\` in Codex with:\n\n\`/plan Create an implementation plan for the feature "${featureName}". Read BRAIN-INDEX.md, AGENTS.md, Execution-Plan.md, and this feature spec first.\`\n\n## Open Questions\n- Clarify constraints, tradeoffs, and rollout details.\n`
+    )
+
+    console.log(`  Created feature spec: ${featurePath}`)
+    console.log('  Next in Codex: run `/plan` to turn the spec into execution tasks.')
+    return
+  }
+
+  if (command === 'sync') {
+    const brainRoot = findBrainRoot(process.cwd())
+    if (!brainRoot) {
+      console.log('  No brain found in this directory tree.')
+      console.log('  Run `brain-tree-os init` first.')
+      return
+    }
+
+    const files = findMarkdownFiles(brainRoot)
+    const relativeFiles = files.map(file => path.relative(brainRoot, file))
+    const byBaseName = new Map(relativeFiles.map(file => [path.basename(file, '.md'), file]))
+    const brokenLinks: Array<{ file: string; target: string }> = []
+    const missingParents: string[] = []
+
+    for (const file of files) {
+      const relative = path.relative(brainRoot, file)
+      const content = fs.readFileSync(file, 'utf8')
+
+      if (relative !== 'BRAIN-INDEX.md' && !content.includes('> Part of [[')) {
+        missingParents.push(relative)
+      }
+
+      const matches = [...content.matchAll(/\[\[([^\]]+)\]\]/g)]
+      for (const match of matches) {
+        const target = match[1].trim()
+        if (!byBaseName.has(target) && !relativeFiles.some(candidate => candidate.replace(/\.md$/, '') === target)) {
+          brokenLinks.push({ file: relative, target })
+        }
+      }
+    }
+
+    console.log('')
+    console.log(`  Files scanned: ${relativeFiles.length}`)
+    console.log(`  Broken wikilinks: ${brokenLinks.length}`)
+    console.log(`  Files missing parent link: ${missingParents.length}`)
+    if (brokenLinks.length > 0) {
+      console.log('')
+      console.log('  Broken links:')
+      for (const item of brokenLinks.slice(0, 10)) {
+        console.log(`  - ${item.file} -> [[${item.target}]]`)
+      }
+    }
+    if (missingParents.length > 0) {
+      console.log('')
+      console.log('  Missing `> Part of [[...]]` lines:')
+      for (const item of missingParents.slice(0, 10)) {
+        console.log(`  - ${item}`)
+      }
+    }
+    console.log('')
+    console.log('  Next in Codex: ask it to fix the issues found here, then run `brain-tree-os sync` again.')
+    return
+  }
+
+  if (command === 'codex') {
+    const brainRoot = findBrainRoot(process.cwd())
+    if (!brainRoot) {
+      console.log('  No brain found in this directory tree.')
+      console.log('  Run `brain-tree-os init` first.')
+      return
+    }
+
+    commandPromptSummary(brainRoot)
     return
   }
 

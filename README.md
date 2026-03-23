@@ -60,7 +60,9 @@ Use the files listed by `resume` as the starting context for the next session.
 
 ## Commands
 
-BrainTree no longer depends on product-specific slash commands. Codex works best with plain shell commands and repository files.
+BrainTree uses a split model in Codex:
+- Codex native slash commands for conversation/session control
+- `brain-tree-os ...` shell commands for brain-specific project workflows
 
 ### `brain-tree-os`
 
@@ -99,6 +101,26 @@ Create the next handoff template in `Handoffs/` so the session ends with explici
 ### `brain-tree-os status`
 
 Show the current brain if you are inside one, otherwise list all registered brains.
+
+### `brain-tree-os plan [step]`
+
+Create a linked step-planning note from `Execution-Plan.md`, then use Codex `/plan` to refine it in-chat.
+
+### `brain-tree-os sprint`
+
+Create a sprint note from in-progress and ready execution-plan steps.
+
+### `brain-tree-os sync`
+
+Scan the brain for broken wikilinks and disconnected notes.
+
+### `brain-tree-os feature <name>`
+
+Create a linked feature spec note in the product or vision area.
+
+### `brain-tree-os codex`
+
+Show the current mapping between Codex native slash commands and BrainTree workflow commands.
 
 ---
 
@@ -163,17 +185,28 @@ Then:
 
 ---
 
-## Why There Are No Slash Commands Or Hooks
+## Codex Mapping
 
-Codex exposes shell commands, `AGENTS.md`, and MCP integrations. It does not expose a supported slash-command system in the local CLI, and I do not have evidence for a supported automatic hook file format.
+Codex does have built-in slash commands such as `/init`, `/plan`, `/resume`, and `/status`.
 
-BrainTree therefore uses the primitives Codex actually supports:
-- normal CLI commands
+BrainTree maps onto Codex like this:
+- `/init` handles Codex session or `AGENTS.md` setup
+- `/plan` handles in-chat planning
+- `/resume` resumes a Codex conversation transcript
+- `/status` shows Codex session state
+- `brain-tree-os init` creates the project brain scaffold
+- `brain-tree-os resume` reloads project brain context
+- `brain-tree-os wrap-up` creates the next handoff template
+- `brain-tree-os plan`, `sprint`, `sync`, and `feature` create or audit project-level brain artifacts
+
+## Hooks
+
+I still do not have evidence for a supported Codex hook file format comparable to Claude-style pre/post tool hooks. BrainTree therefore does not claim hook parity. The supported workflow uses:
+- Codex native slash commands
+- `brain-tree-os` shell commands
 - repository brain files
 - `AGENTS.md`
 - the live viewer
-
-That is the reliable path for Codex.
 
 ---
 
