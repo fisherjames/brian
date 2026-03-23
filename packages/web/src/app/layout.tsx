@@ -3,10 +3,10 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: {
-    default: 'BrainTree OS',
-    template: '%s | BrainTree OS',
+    default: 'Brian',
+    template: '%s | Brian',
   },
-  description: 'Open source brain viewer for AI-native project management.',
+  description: 'Open source Brian workspace viewer for AI-native project management.',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

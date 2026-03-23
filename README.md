@@ -1,260 +1,166 @@
-<div align="center">
+# Brian
 
-<img src="packages/web/public/logo.png" alt="BrainTree OS" width="180" />
+<p align="center">
+  <img src="packages/web/public/logo.svg" alt="Brian" width="180" />
+</p>
 
-# BrainTree OS
+Brian is a Codex-first project memory layer: a local viewer, a repository scaffold, and a small CLI for keeping AI-readable project context in the repo instead of only in chat history.
 
-**Give Codex a brain.**
+The new default layout is:
 
-A local-first project memory system for Codex. It gives an existing repository a structured brain with a viewer, indexed notes, execution plans, handoffs, and Codex-facing instructions in `AGENTS.md`.
+```text
+repo/
+├── AGENTS.md
+├── .brian/
+│   └── brain.json
+└── brian/
+    ├── index.md
+    ├── execution-plan.md
+    ├── product/
+    ├── engineering/
+    ├── operations/
+    ├── commands/
+    ├── agents/
+    ├── handoffs/
+    ├── templates/
+    └── assets/
+```
 
-[![npm version](https://img.shields.io/npm/v/brain-tree-os.svg)](https://www.npmjs.com/package/brain-tree-os)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue?logo=typescript&logoColor=white)](https://typescriptlang.org)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
-[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D20-green?logo=node.js&logoColor=white)](https://nodejs.org)
+Legacy BrainTree repos still work. Brian reads both the new `brian/` + `.brian/` layout and the older root-level BrainTree layout.
 
-[Getting Started](docs/getting-started.md) · [Commands](#-commands) · [Brain Format](#-brain-format) · [Workflow](#-workflow) · [Contributing](CONTRIBUTING.md)
-
-<img src="docs/screenshots/demo-brain.png" alt="BrainTree OS - Brain viewer" width="756" />
-
-</div>
-
----
-
-## Quick Start
-
-> **Requires [Node.js 20+](https://nodejs.org) and Codex**
-
-This README shows the fastest path. For the full fork-local setup, existing-project flow, and daily operating routine, use [docs/getting-started.md](docs/getting-started.md).
-
-### 1. Clone and build this fork
+## Install
 
 ```bash
 git clone https://github.com/fisherjames/brain-tree-os.git
 cd brain-tree-os
 npm install
+npm run build
 npm run install:cli
 ```
 
-### 2. Start the viewer
+That links both commands globally:
 
 ```bash
+brian
 brain-tree-os
 ```
 
-This starts the local BrainTree viewer and opens the brains page in your browser. Use `--port 3010` if `3000` is already in use.
+`brain-tree-os` remains a compatibility alias. New docs and scaffolds use `brian`.
 
-### 3. Initialize a brain inside an existing project
+## Quick Start
 
-Open a second terminal in the project you want Codex to manage:
+1. Start the viewer:
 
 ```bash
-cd /path/to/your-project
-brain-tree-os init
+brian --port 3010
 ```
 
-That command creates a Codex-first brain scaffold inside the repository and registers it in `~/.braintree-os/brains.json`.
-In a normal terminal it now opens a short init wizard with defaults, and the recommended preset is `codex-team`.
-
-### 4. Resume the project in Codex
-
-Still inside the project:
+2. In an existing project:
 
 ```bash
-brain-tree-os resume
+cd /path/to/project
+brian init
+```
+
+3. Then resume and open Codex:
+
+```bash
+brian resume
 codex
 ```
 
-Use the files listed by `resume` as the starting context for the next session.
+4. For older repos, migrate the layout when you are ready:
 
----
+```bash
+brian migrate
+```
+
+The viewer will show:
+- the note graph
+- file tree
+- execution-plan progress
+- team-board progress if the repo mirrors orchestration state into `brian/commands/team-board.md`
+- handoff history
 
 ## Commands
 
-BrainTree uses a split model in Codex:
-- Codex native slash commands for conversation/session control
-- `brain-tree-os ...` shell commands for brain-specific project workflows
+- `brian` starts the local viewer.
+- `brian init` scaffolds a new Brian workspace in the current repo.
+- `brian resume` prints the canonical files to read at session start.
+- `brian wrap-up` creates the next handoff template.
+- `brian status` shows the active brain or all registered brains.
+- `brian notes "<scope>"` runs a Codex note-reconciliation pass after top-level note edits.
+- `brian plan [step]` creates a linked plan note from the execution plan.
+- `brian sprint` creates a sprint note from in-progress and ready work.
+- `brian sync` scans for broken wikilinks and missing parent links.
+- `brian feature "<name>"` creates a linked feature note.
+- `brian codex` prints the Codex/Brian command split.
+- `brian migrate` moves a legacy BrainTree repo into the new `brian/` layout.
 
-### `brain-tree-os`
+## Init Wizard
 
-Start the viewer.
+`brian init` now prompts for:
 
-Options:
-- `--port <number>`
-- `--no-open`
+- project name
+- description
+- preset: `core` or `codex-team`
+- whether to link existing markdown docs
+- whether to add `package.json` helper scripts
 
-### `brain-tree-os init`
+The `codex-team` preset also scaffolds:
 
-Create a brain scaffold in the current project.
+- `brian/commands/`
+- `brian/commands/team-board.md`
+- richer role notes in `brian/agents/`
+- optional repo-local `brain:*` helper scripts
 
-Options:
-- `--name <text>`
-- `--description <text>`
+## Codex Workflow
 
-What it creates:
+Brian and Codex have different responsibilities:
+
+- Codex native slash commands manage the current conversation.
+- Brian shell commands manage the repo memory layer.
+
+Typical session flow:
+
+```bash
+brian resume
+codex
+```
+
+Then inside Codex:
+- read the files printed by `brian resume`
+- inspect the relevant folder index
+- do the task
+- update notes when architecture, workflow, or priorities changed
+
+At the end:
+
+```bash
+brian wrap-up
+```
+
+Then have Codex fill the newest handoff and update `brian/execution-plan.md` if status changed.
+
+Important limit: Brian does not claim fake hook parity. Codex skills are useful for behavior, but they do not inject text into an already-open live Codex session. The supported workflow uses repo files, shell commands, and Codex prompts honestly.
+
+## Docs
+
+- [Getting started](docs/getting-started.md)
+- [Codex workflow](docs/codex.md)
+
+## Compatibility
+
+Brian reads and preserves legacy BrainTree repos that still use:
+
 - `.braintree/brain.json`
 - `BRAIN-INDEX.md`
-- `AGENTS.md`
 - `Execution-Plan.md`
+- `01_Product/`
+- `02_Engineering/`
+- `03_Operations/`
+- `Commands/`
+- `Agents/`
 - `Handoffs/`
-- `Templates/`
-- `Assets/`
-- starter product, engineering, operations, and agent notes
 
-### `brain-tree-os resume`
-
-Show the core files Codex should read before doing non-trivial work.
-
-### `brain-tree-os wrap-up`
-
-Create the next handoff template in `Handoffs/` so the session ends with explicit continuity.
-
-### `brain-tree-os status`
-
-Show the current brain if you are inside one, otherwise list all registered brains.
-
-### `brain-tree-os notes <scope>`
-
-Run a bounded Codex reconciliation pass after changing a top-level or workflow note so downstream brain notes stay aligned.
-
-### `brain-tree-os plan [step]`
-
-Create a linked step-planning note from `Execution-Plan.md`, then use Codex `/plan` to refine it in-chat.
-
-### `brain-tree-os sprint`
-
-Create a sprint note from in-progress and ready execution-plan steps.
-
-### `brain-tree-os sync`
-
-Scan the brain for broken wikilinks and disconnected notes.
-
-### `brain-tree-os feature <name>`
-
-Create a linked feature spec note in the product or vision area.
-
-### `brain-tree-os codex`
-
-Show the current mapping between Codex native slash commands and BrainTree workflow commands.
-
----
-
-## Brain Format
-
-Every brain is a directory on your filesystem with this structure:
-
-```text
-my-project/
-├── .braintree/
-│   └── brain.json
-├── BRAIN-INDEX.md
-├── AGENTS.md
-├── Execution-Plan.md
-├── 01_Product/
-├── 02_Engineering/
-├── 03_Operations/
-├── Agents/
-├── Handoffs/
-├── Templates/
-└── Assets/
-```
-
-### Key files
-
-- `BRAIN-INDEX.md` is the central hub linking the top-level notes.
-- `AGENTS.md` contains Codex-facing working rules for the repository.
-- `Execution-Plan.md` is the roadmap and current priority list.
-- `Handoffs/` preserves continuity between sessions.
-- `Assets/` stores screenshots, PDFs, and other reference material.
-
-### Wikilinks
-
-BrainTree uses `[[wikilinks]]` between notes. The viewer turns those links into a live graph, file tree, and note browser.
-
----
-
-## Workflow
-
-The core BrainTree fork gives you:
-- a filesystem brain scaffold
-- a local viewer
-- shell commands for brain-specific workflows
-
-If you want repo-specific wrappers such as `pnpm brain:start`, role skills, or parallel worktree orchestration, add those in the managed project itself. BrainTree core stays smaller on purpose.
-
-### Session 0
-
-```bash
-brain-tree-os
-cd /path/to/project
-brain-tree-os init
-codex
-```
-
-### Every later session
-
-```bash
-cd /path/to/project
-brain-tree-os resume
-codex
-```
-
-Then:
-1. Read `BRAIN-INDEX.md`, `AGENTS.md`, `Execution-Plan.md`, and the latest handoff.
-2. Inspect the relevant folder index.
-3. Make a narrow, real change.
-4. Run `brain-tree-os wrap-up` before ending the session.
-
----
-
-## Codex Mapping
-
-Codex does have built-in slash commands such as `/init`, `/plan`, `/resume`, and `/status`.
-
-BrainTree maps onto Codex like this:
-- `/init` handles Codex session or `AGENTS.md` setup
-- `/plan` handles in-chat planning
-- `/resume` resumes a Codex conversation transcript
-- `/status` shows Codex session state
-- `brain-tree-os init` creates the project brain scaffold
-- `brain-tree-os resume` reloads project brain context
-- `brain-tree-os wrap-up` creates the next handoff template
-- `brain-tree-os plan`, `sprint`, `sync`, and `feature` create or audit project-level brain artifacts
-
-## Hooks
-
-I still do not have evidence for a supported Codex hook file format comparable to the older agent-specific pre/post tool hook model. BrainTree therefore does not claim hook parity. The supported workflow uses:
-- Codex native slash commands
-- `brain-tree-os` shell commands
-- repository brain files
-- `AGENTS.md`
-- the live viewer
-
----
-
-## The Viewer
-
-The web viewer at `localhost:3000` shows your brain visually:
-- graph view
-- file tree
-- markdown viewer
-- execution plan pane
-- session timeline
-- optional `Commands/Team-Board.md` progress rows when a managed project mirrors local orchestration state into the brain
-
-Files created or edited by Codex appear in the browser via filesystem watching.
-
----
-
-## Contributing
-
-We welcome contributions. See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
-
-## Security
-
-Found a vulnerability? See [SECURITY.md](SECURITY.md) for our disclosure policy.
-
-## License
-
-MIT. See [LICENSE](LICENSE) for details.
+Use `brian migrate` when you want to move that structure into the new lowercase layout.

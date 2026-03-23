@@ -76,7 +76,7 @@ app.prepare().then(() => {
   })
 
   server.listen(port, () => {
-    console.log(`> BrainTree OS running at http://localhost:${port}`)
+    console.log(`> Brian running at http://localhost:${port}`)
   })
 
   const shutdown = () => {

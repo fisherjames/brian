@@ -16,7 +16,7 @@ interface BrainCardData {
 }
 
 function countAgentNotes(files: Array<{ path: string }>) {
-  return files.filter((f) => f.path === 'AGENTS.md' || f.path.startsWith('Agents/')).length
+  return files.filter((f) => f.path === 'AGENTS.md' || f.path.startsWith('Agents/') || f.path.startsWith('brian/agents/')).length
 }
 
 function getBrainData(): { demos: BrainCardData[]; userBrains: BrainCardData[] } {
@@ -63,15 +63,15 @@ export default function BrainsPage() {
     <div className="bg-mesh grain min-h-screen">
       <nav className="animate-fade-up relative z-50 flex items-center justify-between px-6 py-3 lg:px-12 lg:py-5">
         <div className="flex items-center gap-2 lg:gap-3">
-          <img src="/logo.png" alt="BrainTree" className="h-8 lg:h-10" />
-          <span className="text-[15px] font-semibold tracking-tight lg:text-[18px]">BrainTree OS</span>
+          <img src="/logo.svg" alt="Brian" className="h-8 lg:h-10" />
+          <span className="text-[15px] font-semibold tracking-tight lg:text-[18px]">Brian</span>
         </div>
       </nav>
 
       <main className="mx-auto max-w-5xl px-6 py-4 lg:px-12 lg:py-6">
         <div className="animate-fade-up animate-delay-1 mb-5">
           <h1 className="text-2xl font-semibold tracking-tight lg:text-3xl">Brains</h1>
-          <p className="mt-1 text-[14px] text-text-secondary">Explore project brains or create your own.</p>
+          <p className="mt-1 text-[14px] text-text-secondary">Explore project Brian workspaces or create your own.</p>
         </div>
 
         <BrainsPageClient initialDemos={demos} initialUserBrains={userBrains} />

@@ -61,11 +61,13 @@ export function startWatcher(brainId: string, ws: WebSocket): WatcherHandle {
           ws.send(JSON.stringify({ type: 'execution_steps', data: steps }))
         }
 
-        // Re-parse handoffs if the change is in Handoffs/
+        // Re-parse handoffs if the change is in handoffs/
         if (
           !changedPath ||
           changedPath.includes('Handoffs/') ||
-          changedPath.includes('Handoffs\\')
+          changedPath.includes('Handoffs\\') ||
+          changedPath.includes('brian/handoffs/') ||
+          changedPath.includes('brian\\handoffs\\')
         ) {
           const handoffs = getHandoffs(brainPath, files)
           ws.send(JSON.stringify({ type: 'handoffs', data: handoffs }))

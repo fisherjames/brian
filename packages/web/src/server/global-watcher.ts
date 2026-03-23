@@ -3,7 +3,10 @@ import * as path from 'node:path'
 import * as os from 'node:os'
 import * as fs from 'node:fs'
 
-const BRAINS_JSON = path.join(os.homedir(), '.braintree-os', 'brains.json')
+const BRAINS_JSON = [
+  path.join(os.homedir(), '.brian', 'brains.json'),
+  path.join(os.homedir(), '.braintree-os', 'brains.json'),
+]
 
 export type GlobalListener = () => void
 
@@ -29,11 +32,9 @@ export function addGlobalListener(listener: GlobalListener): () => void {
 }
 
 function startGlobalWatcher() {
-  const dir = path.dirname(BRAINS_JSON)
-
-  // Ensure directory exists
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true })
+  for (const file of BRAINS_JSON) {
+    const dir = path.dirname(file)
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
   }
 
   watcher = chokidar.watch(BRAINS_JSON, {

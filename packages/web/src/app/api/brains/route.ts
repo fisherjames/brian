@@ -3,7 +3,7 @@ import { listBrains, getDemoBrainPath, DEMO_BRAIN, scanBrainFiles } from '@/lib/
 import { buildDepartmentColorMap } from '@/components/brain/department-colors'
 
 function countAgentNotes(files: Array<{ path: string }>) {
-  return files.filter((f) => f.path === 'AGENTS.md' || f.path.startsWith('Agents/')).length
+  return files.filter((f) => f.path === 'AGENTS.md' || f.path.startsWith('Agents/') || f.path.startsWith('brian/agents/')).length
 }
 
 export async function GET() {

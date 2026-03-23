@@ -1,9 +1,10 @@
 {
   "name": "brain-tree-os",
   "version": "0.1.0",
-  "description": "Open source brain viewer for AI-native project management",
+  "description": "Brian CLI for Codex-first project memory",
   "bin": {
-    "brain-tree-os": "./dist/index.js"
+    "brain-tree-os": "./dist/index.js",
+    "brian": "./dist/index.js"
   },
   "scripts": {
     "build": "tsc",
@@ -11,7 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "files": ["dist/", "README.md"],
-  "keywords": ["ai", "project-management", "brain", "obsidian", "codex"],
+  "keywords": ["ai", "project-management", "brain", "brian", "obsidian", "codex"],
   "license": "MIT",
   "dependencies": {
     "open": "^10.1.0"

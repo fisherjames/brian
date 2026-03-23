@@ -63,8 +63,8 @@ export default function BrainLoader() {
         {/* Logo with breathing animation */}
         <div className="brain-breathe absolute inset-0 flex items-center justify-center">
           <img
-            src="/logo.png"
-            alt="Braintree"
+            src="/logo.svg"
+            alt="Brian"
             className="h-16 w-16 drop-shadow-md"
             style={{
               filter: 'drop-shadow(0 0 12px rgba(91, 154, 101, 0.3))',

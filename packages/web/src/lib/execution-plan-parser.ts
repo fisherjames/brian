@@ -1,5 +1,5 @@
 /**
- * Parse Execution-Plan.md markdown into structured steps.
+ * Parse brian execution-plan and team-board markdown into structured steps.
  * Handles both table format (| Step | Title | Status |) and
  * header format (#### Step 1.1: Title).
  */
@@ -138,5 +138,9 @@ export function parseExecutionPlan(content: string): ParsedStep[] {
 
 export function isExecutionPlanFile(path: string): boolean {
   const lower = path.toLowerCase()
-  return lower.endsWith('execution-plan.md') || lower.endsWith('execution_plan.md')
+  return (
+    lower.endsWith('execution-plan.md') ||
+    lower.endsWith('execution_plan.md') ||
+    lower.endsWith('team-board.md')
+  )
 }

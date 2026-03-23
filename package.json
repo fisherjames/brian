@@ -1,18 +1,19 @@
 {
   "name": "brain-tree-os",
   "version": "0.1.4",
-  "description": "Open source brain viewer and project management for AI agents",
+  "description": "Brian viewer and Codex-first project memory for AI-native repos",
   "license": "MIT",
-  "author": "BrainTree <dev@brain-tree.ai>",
-  "homepage": "https://brain-tree.ai",
+  "author": "Brian",
+  "homepage": "https://github.com/fisherjames/brain-tree-os",
   "repository": {
     "type": "git",
-    "url": "https://github.com/brain-tree-dev/brain-tree-os.git"
+    "url": "https://github.com/fisherjames/brain-tree-os.git"
   },
   "bugs": {
-    "url": "https://github.com/brain-tree-dev/brain-tree-os/issues"
+    "url": "https://github.com/fisherjames/brain-tree-os/issues"
   },
   "keywords": [
+    "brian",
     "braintree",
     "brain",
     "ai",
@@ -23,7 +24,8 @@
     "open-source"
   ],
   "bin": {
-    "brain-tree-os": "packages/cli/dist/index.js"
+    "brain-tree-os": "packages/cli/dist/index.js",
+    "brian": "packages/cli/dist/index.js"
   },
   "files": [
     "packages/cli/dist/",
@@ -53,7 +55,7 @@
     "build": "npm run build --workspace=packages/cli && npm run build --workspace=packages/web",
     "typecheck": "npm run typecheck --workspace=packages/cli && npm run typecheck --workspace=packages/web",
     "install:cli": "npm run build && npm link",
-    "remove:cli": "npm unlink -g brain-tree-os"
+    "remove:cli": "npm unlink -g brain-tree-os brian"
   },
   "engines": {
     "node": ">=20.0.0"

@@ -1,9 +1,9 @@
 /**
- * Stable palette used for root-folder color dots throughout the brain UI
+ * Stable palette used for root-folder color dots throughout the brian UI
  * (file tree, graph view, brain cards, share cards).
  *
- * The first 11 slots map to the numbered BrainTree departments (00-10).
- * Extra colors cover ad-hoc folders so every root always gets a colour.
+ * The palette is intentionally generic so modern `brian/` layouts and
+ * legacy top-level folders both render consistently.
  */
 export const ROOT_FOLDER_COLORS: string[] = [
   '#5B9A65', // 00_Company  (leaf green)

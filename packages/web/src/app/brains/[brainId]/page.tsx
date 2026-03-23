@@ -49,7 +49,7 @@ export default async function BrainPage({ params }: { params: Promise<{ brainId:
       <nav className="relative z-50 flex shrink-0 items-center justify-between border-b border-border px-3 py-2 sm:px-4 sm:py-2.5 lg:px-6">
         <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           <Link href="/" className="flex shrink-0 items-center gap-2">
-            <img src="/logo.png" alt="BrainTree" className="h-6 sm:h-7" />
+            <img src="/logo.svg" alt="Brian" className="h-6 sm:h-7" />
           </Link>
           <span className="text-text-muted">/</span>
           <Link href="/brains" className="hidden text-[13px] text-text-secondary transition-colors hover:text-text sm:inline">Brains</Link>

@@ -363,7 +363,7 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(
               fontWeight: 500,
             }}
           >
-            Built with Braintree
+            Built with Brian
           </span>
         </div>
       </div>

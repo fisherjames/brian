@@ -256,7 +256,7 @@ function ResumeBrainCta() {
             </button>
           </div>
           <p className="mt-2 text-[10px] leading-relaxed text-text-muted">
-            Fallback for generic BrainTree repos: <code>npx brain-tree-os resume &amp;&amp; codex</code>
+            Generic repos can use <code>brian resume &amp;&amp; codex</code>. The legacy alias <code>brain-tree-os</code> still works.
           </p>
         </div>
       )}

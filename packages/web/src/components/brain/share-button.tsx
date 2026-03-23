@@ -44,7 +44,7 @@ export function ShareButton({
         setLogoBase64(canvas.toDataURL('image/png'));
       }
     };
-    img.src = '/logo.png';
+    img.src = '/logo.svg';
   }, []);
 
   // Close on outside click

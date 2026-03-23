@@ -1,79 +1,98 @@
-# BrainTree For Codex
+# Brian For Codex
 
-BrainTree is now a Codex-first workflow built from repository files plus a local viewer.
+Brian is a Codex-first repo memory layer built from:
 
-For the full local-fork setup and daily workflow, start with [docs/getting-started.md](getting-started.md).
+- markdown notes inside the repository
+- a local viewer
+- a small CLI
 
-## Supported primitives
+Use `brian` as the primary command. `brain-tree-os` still works as a compatibility alias.
 
-- Codex `/init`
-- Codex `/plan`
-- Codex `/resume`
-- Codex `/status`
-- `brain-tree-os init`
-- `brain-tree-os resume`
-- `brain-tree-os wrap-up`
-- `brain-tree-os status`
-- `brain-tree-os notes`
-- `brain-tree-os plan`
-- `brain-tree-os sprint`
-- `brain-tree-os sync`
-- `brain-tree-os feature`
-- `AGENTS.md`
-- `BRAIN-INDEX.md`
-- `Execution-Plan.md`
-- `Handoffs/`
+## Command Split
 
-## Command mapping
+Codex slash commands handle conversation behavior:
 
-- Old BrainTree session init maps to `brain-tree-os init`
-- Old BrainTree resume maps to `brain-tree-os resume`
-- Old BrainTree wrap-up maps to `brain-tree-os wrap-up`
-- Old BrainTree status maps to `brain-tree-os status`
-- Top-down note reconciliation maps to `brain-tree-os notes`
-- In-chat planning maps to Codex `/plan`
-- Codex conversation resume maps to Codex `/resume`
-- Codex `AGENTS.md` bootstrap maps to Codex `/init`
+- `/init`
+- `/plan`
+- `/resume`
+- `/status`
 
-## Unsupported assumptions
+Brian shell commands handle project-memory behavior:
 
-Do not assume:
-- a documented automatic hook file format
-- agent-specific hidden command directories
+- `brian init`
+- `brian resume`
+- `brian wrap-up`
+- `brian status`
+- `brian notes`
+- `brian plan`
+- `brian sprint`
+- `brian sync`
+- `brian feature`
+- `brian migrate`
 
-Those are not part of the supported Codex workflow for this project.
+These are complementary, not duplicates.
 
-## Recommended project routine
+## Default Repo Layout
 
-1. Start the viewer from the built fork CLI.
-2. Run `brain-tree-os init` once per existing project.
-3. Run `brain-tree-os resume` at the start of every work session.
-4. Open Codex and follow `AGENTS.md`.
-5. Run `brain-tree-os wrap-up` before ending a substantial session.
+```text
+AGENTS.md
+.brian/brain.json
+brian/
+  index.md
+  execution-plan.md
+  product/
+  engineering/
+  operations/
+  commands/
+  agents/
+  handoffs/
+  templates/
+  assets/
+```
 
-## Scope Boundary
+Brian also reads the older BrainTree layout for compatibility.
 
-BrainTree core handles:
-- the brain scaffold
-- the viewer
-- project-brain shell commands
+## Start A Session
 
-Repo-local workflow layers should handle:
-- custom `pnpm brain:*` wrappers
-- role-specific Codex skills
-- team worktree orchestration
-- any local task board mirrored into committed markdown
+```bash
+brian resume
+codex
+```
 
-## Expected brain files
+Read the files printed by `brian resume`, then follow `AGENTS.md`.
 
-- `.braintree/brain.json`
-- `BRAIN-INDEX.md`
-- `AGENTS.md`
-- `Execution-Plan.md`
-- `01_Product/`
-- `02_Engineering/`
-- `03_Operations/`
-- `Agents/`
-- `Handoffs/`
-- `Templates/`
-- `Assets/`
+## End A Session
+
+```bash
+brian wrap-up
+```
+
+Then ask Codex to:
+
+- fill the newest handoff
+- update the relevant brian notes
+- update `brian/execution-plan.md` if progress changed
+
+## Honest Limit
+
+Codex skills help with behavior and specialization. They do not provide a native transport for injecting text into an already-open live Codex thread.
+
+That means:
+- a skill can decide how wrap-up should work
+- a shell command can launch Codex with a wrap-up prompt
+- neither can silently post a new prompt into the exact live thread you already have open
+
+Brian therefore does not pretend to offer a hook or live-thread injection feature that Codex does not document.
+
+## When To Use Repo-Local Workflow Layers
+
+Keep Brian core generic.
+
+If a project wants richer flows such as:
+- `pnpm brain:start`
+- team planning
+- worktree fan-out
+- role-specific skills
+- review or merge orchestration
+
+add those in the managed repo, then mirror status back into `brian/commands/team-board.md` so the viewer can show progress.
