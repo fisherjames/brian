@@ -91,7 +91,7 @@ function CreateBrainCard() {
       </div>
       <span className="text-[14px] font-medium text-text-secondary">Create your own</span>
       <span className="mt-1 text-center text-[12px] text-text-muted">
-        Run <code className="rounded bg-bg-card px-1 font-mono text-[11px]">/init-braintree</code> in Claude Code
+        Run <code className="rounded bg-bg-card px-1 font-mono text-[11px]">npx brain-tree-os init</code> in your project, then open Codex there
       </span>
     </div>
   )

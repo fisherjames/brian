@@ -128,8 +128,8 @@ export function scanBrainFiles(brainPath: string): BrainFile[] {
     }
 
     for (const entry of entries) {
-      // Skip hidden dirs (except .claude)
-      if (entry.name.startsWith('.') && entry.name !== '.claude') continue
+      // Skip hidden dirs
+      if (entry.name.startsWith('.')) continue
       // Skip node_modules
       if (entry.name === 'node_modules') continue
 

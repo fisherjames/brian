@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "files": ["dist/", "README.md"],
-  "keywords": ["ai", "project-management", "brain", "obsidian", "claude"],
+  "keywords": ["ai", "project-management", "brain", "obsidian", "codex"],
   "license": "MIT",
   "dependencies": {
     "open": "^10.1.0"
