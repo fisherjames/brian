@@ -116,7 +116,7 @@ overflow: hidden  (no scroll at app level)
 │  ┌───────────┐ ┌ - - - - -┐    │
 │  │ ●●● [name]│ │     +     │    │  ← new session card (dashed)
 │  │     [RUN] │ │           │    │
-│  │ > claude  │ └ - - - - -┘    │
+│  │ > codex  │ └ - - - - -┘    │
 │  │         ↗ │                  │
 │  └───────────┘                  │
 │                                 │

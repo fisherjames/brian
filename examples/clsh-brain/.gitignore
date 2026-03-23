@@ -1,4 +1,4 @@
 node_modules/
 .DS_Store
 .obsidian/
-.claude/settings.local.json
+.codex/settings.local.json

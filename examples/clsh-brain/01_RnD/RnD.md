@@ -46,7 +46,7 @@ Session 11 (2026-03-14) — quick fixes:
 - Extracted 1024×1024 profile image (`clsh-profile-1024.png`)
 
 Session 15 (2026-03-14) — tmux session persistence + settings bug fix:
-- **tmux persistence**: New hybrid pty-manager wraps zsh/claude sessions in invisible tmux. Sessions survive server restarts. Auto-detects tmux, falls back to ephemeral. New `tmux.ts` utility, `pty_sessions` SQLite table, `CLSH_NO_TMUX=1` opt-out.
+- **tmux persistence**: New hybrid pty-manager wraps zsh/codex sessions in invisible tmux. Sessions survive server restarts. Auto-detects tmux, falls back to ephemeral. New `tmux.ts` utility, `pty_sessions` SQLite table, `CLSH_NO_TMUX=1` opt-out.
 - **Settings panel bug**: Fixed — panel was only rendered in grid-view branch of `App.tsx`. Now renders in terminal view too.
 - **README**: Added "Session Persistence (tmux)" section explaining setup, importance, and opt-out.
 

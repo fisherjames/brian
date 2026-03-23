@@ -14,7 +14,7 @@ created: 2026-03-12
 | **VS Code Remote Tunnels** | Remote VS Code via Microsoft relay | clsh is open source, no Microsoft account needed |
 | **Blink Shell** | iOS SSH client | clsh is free, web-based, no app install |
 | **Termux** | Android terminal emulator | clsh connects to YOUR Mac, not a local shell |
-| **ttyd** | Web terminal emulator | clsh has auth, mobile UI, multi-pane, Claude Code |
+| **ttyd** | Web terminal emulator | clsh has auth, mobile UI, multi-pane, Codex |
 
 ## Indirect Competitors
 
@@ -26,7 +26,7 @@ created: 2026-03-12
 
 ## Key Differentiator
 
-No one else combines: **real PTY sessions** + **phone-optimized UI** + **Claude Code pane** + **QR code auth** + **MacBook Pro frame aesthetic** + **fully open source**.
+No one else combines: **real PTY sessions** + **phone-optimized UI** + **Codex pane** + **QR code auth** + **MacBook Pro frame aesthetic** + **fully open source**.
 
 ## Current State
 

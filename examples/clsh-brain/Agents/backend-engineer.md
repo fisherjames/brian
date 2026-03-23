@@ -20,7 +20,7 @@ tools:
 ## Your Responsibilities
 
 1. Build the Node.js agent (`packages/agent`)
-2. Implement PTYManager class (spawn, write, resize, kill for zsh/tmux/claude)
+2. Implement PTYManager class (spawn, write, resize, kill for zsh/tmux/codex)
 3. Build WebSocket handler with session routing and authentication
 4. Implement bootstrap token auth (256-bit, SHA-256, one-time use)
 5. Build magic link auth flow via Resend
@@ -37,7 +37,7 @@ tools:
 
 - Runtime: Node.js 20+ with ESM modules
 - Server: Express + ws (WebSocket)
-- PTY: node-pty spawns real terminal processes (zsh, tmux, claude CLI)
+- PTY: node-pty spawns real terminal processes (zsh, tmux, codex CLI)
 - Auth: Bootstrap token → JWT (jose) → Magic link (Resend)
 - Database: better-sqlite3 with WAL mode at ~/.clsh/clsh.db
 - Security: Strip sensitive env vars before passing to PTY spawn

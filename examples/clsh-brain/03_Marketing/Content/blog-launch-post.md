@@ -17,7 +17,7 @@ platform: Dev.to, Hashnode
 
 ### How I Built clsh: Phone-First Terminal Access to Your Mac
 
-I use Claude Code a lot. Not "a few commands a day," full refactoring sessions that run for minutes at a time. And I kept running into the same problem: I'd walk away from my desk, grab my phone, and have zero visibility into what was happening.
+I use Codex a lot. Not "a few commands a day," full refactoring sessions that run for minutes at a time. And I kept running into the same problem: I'd walk away from my desk, grab my phone, and have zero visibility into what was happening.
 
 Is it still running? Did it error out? Is it about to overwrite something it shouldn't?
 
@@ -25,7 +25,7 @@ I tried SSH clients. I tried web-based terminals. Every option had the same flaw
 
 So I built **clsh**, an open-source tool that gives you real terminal access to your Mac from your phone, with a keyboard that actually works.
 
-Since it's real PTY sessions, everything that runs in a terminal just works. Claude Code's TUI, Aider's diff view, tmux, vim, git, whatever. This turned out to be one of the most important use cases: with AI coding agents running long sessions, you need a way to monitor and control them from anywhere.
+Since it's real PTY sessions, everything that runs in a terminal just works. Codex's TUI, Aider's diff view, tmux, vim, git, whatever. This turned out to be one of the most important use cases: with AI coding agents running long sessions, you need a way to monitor and control them from anywhere.
 
 This is the story of how I built it, the technical decisions I made, and what I learned along the way.
 
@@ -44,7 +44,7 @@ Each session gets its own PTY and its own WebSocket connection. The agent tracks
 ```
 Phone Browser  <-->  WebSocket  <-->  node-pty (zsh)
 Phone Browser  <-->  WebSocket  <-->  node-pty (tmux)
-Phone Browser  <-->  WebSocket  <-->  node-pty (claude)
+Phone Browser  <-->  WebSocket  <-->  node-pty (codex)
 ```
 
 **The Tunnel**
@@ -102,7 +102,7 @@ The landing page at clsh.dev works without any backend. It runs a demo mode that
 
 Building a convincing demo was important because the entire product is about a *feeling*, the feeling of having your MacBook in your pocket. If someone visits the landing page on their phone and the demo makes them go "wait, this is actually usable," the product sells itself.
 
-The demo auto-types commands at human-like speeds (80-140ms per character for Claude responses, faster for regular shell commands), renders real ANSI color output, and lets you tap the keyboard to see it respond. It runs on a 2-second backend connection timeout. If no backend is reachable, demo mode activates automatically.
+The demo auto-types commands at human-like speeds (80-140ms per character for Codex responses, faster for regular shell commands), renders real ANSI color output, and lets you tap the keyboard to see it respond. It runs on a 2-second backend connection timeout. If no backend is reachable, demo mode activates automatically.
 
 ### The Tech Stack
 
@@ -138,8 +138,8 @@ clsh MVP is local-first: your Mac is the server, ngrok is the tunnel, your phone
 The roadmap:
 
 1. **Remote machines**: Cloud VMs that are always on, accessible from anywhere
-2. **Claude bootstrap**: A script that automatically duplicates your local dev environment (dotfiles, repos, configs) to a remote machine
-3. **Teams**: Shared terminal sessions, presence indicators, multiple Claude Code instances working in parallel
+2. **Codex bootstrap**: A script that automatically duplicates your local dev environment (dotfiles, repos, configs) to a remote machine
+3. **Teams**: Shared terminal sessions, presence indicators, multiple Codex instances working in parallel
 
 The vision is your development environment as a service. Start solo with your Mac, scale to remote machines, graduate to team workspaces. All from your phone.
 
@@ -153,7 +153,7 @@ npx clsh
 
 Or try the demo on your phone: [clsh.dev](https://clsh.dev)
 
-GitHub: [github.com/my-claude-utils/clsh](https://github.com/my-claude-utils/clsh)
+GitHub: [github.com/my-codex-utils/clsh](https://github.com/my-codex-utils/clsh)
 
 If you have feedback, ideas, or want to contribute, issues and PRs are open. I'd especially love input on the keyboard UX and what features would make this useful for your workflow.
 

@@ -10,12 +10,12 @@ created: 2026-03-12
 
 ## What We Build
 
-**clsh** is an open-source tool that gives developers browser-based access to their local machine's terminal and Claude Code sessions from any device. Three live terminal panes inside a pixel-perfect MacBook Pro frame — a root shell, a tmux session, and a Claude Code pane — all streaming in real time over WebSocket through an auto-generated ngrok tunnel.
+**clsh** is an open-source tool that gives developers browser-based access to their local machine's terminal and Codex sessions from any device. Three live terminal panes inside a pixel-perfect MacBook Pro frame — a root shell, a tmux session, and a Codex pane — all streaming in real time over WebSocket through an auto-generated ngrok tunnel.
 
 ## How It Works
 
 1. `npx clsh-dev`
-2. Agent spawns real PTY sessions (zsh, tmux, claude)
+2. Agent spawns real PTY sessions (zsh, tmux, codex)
 3. ngrok tunnel auto-creates HTTPS URL + QR code
 4. Scan QR on phone — instant terminal access
 5. xterm.js renders pixel-perfect terminals in browser
@@ -23,7 +23,7 @@ created: 2026-03-12
 ## Target Users
 
 - Developers who want terminal access from any device
-- Claude Code users monitoring sessions remotely
+- Codex users monitoring sessions remotely
 - Developers working across multiple devices
 - Mobile-first developers who want real terminal on the go
 
@@ -31,7 +31,7 @@ created: 2026-03-12
 
 - **One command to start** (`npx clsh-dev`) — zero config, zero signup
 - **Real PTY sessions** — not a simulation, full terminal with colors/vim/everything
-- **Claude Code native** — dedicated pane for Claude Code streaming
+- **Codex native** — dedicated pane for Codex streaming
 - **Pixel-perfect MacBook Pro UI** — notch, menu bar, traffic lights
 - **Mobile-optimized** — tab layout, PWA support, keyboard suppression
 - **Open source** — MIT license, community-driven
@@ -44,5 +44,5 @@ created: 2026-03-12
 ## Links
 
 - **Domain**: clsh.dev
-- **GitHub**: github.com/my-claude-utils/clsh
+- **GitHub**: github.com/my-codex-utils/clsh
 - **License**: MIT

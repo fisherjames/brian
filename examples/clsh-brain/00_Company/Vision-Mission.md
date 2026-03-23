@@ -11,13 +11,13 @@ updated: 2026-03-12
 
 > Your Mac, in your pocket. But way more than that.
 
-Every developer should feel like they have their 13-inch MacBook open in front of them — keyboard, tmux sessions, Claude Code instances — all running on a remote machine, controlled from their phone. No iOS keyboard. A real keyboard. A real terminal. Real development.
+Every developer should feel like they have their 13-inch MacBook open in front of them — keyboard, tmux sessions, Codex instances — all running on a remote machine, controlled from their phone. No iOS keyboard. A real keyboard. A real terminal. Real development.
 
 See [[Vision]] for the full product vision document.
 
 ## Mission
 
-Build the most beautiful phone-first terminal experience. Replace the iOS keyboard with a pixel-perfect MacBook keyboard. Give developers tmux-style session grids they can zoom into. Let Claude bootstrap and sync remote environments automatically.
+Build the most beautiful phone-first terminal experience. Replace the iOS keyboard with a pixel-perfect MacBook keyboard. Give developers tmux-style session grids they can zoom into. Let Codex bootstrap and sync remote environments automatically.
 
 Open source, local-first, one command to start (`npx clsh-dev`).
 
@@ -40,5 +40,5 @@ Solo Developer               →  Team
 1-4 terminal sessions           Shared workspaces
 Personal keyboard skins         Team presence
 Local → Remote sync             Shared repos
-Claude Code solo                Multiple Claudes collaborating
+Codex solo                Multiple Codex agents collaborating
 ```

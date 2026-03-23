@@ -40,14 +40,14 @@ updated: 2026-03-12
 | Three-pane layout | P0 | Complete | `index (1).html` |
 | macOS menu bar + clock | P0 | Complete | — |
 | tmux status bar | P0 | Complete | — |
-| Notch indicator (Claude active) | P0 | Complete | — |
+| Notch indicator (Codex active) | P0 | Complete | — |
 | Fullscreen toggle | P0 | Complete | — |
 
 ## Backend / Infrastructure
 
 | Feature | Priority | Status |
 |---------|----------|--------|
-| PTY manager (zsh/tmux/Claude) | P0 | Complete |
+| PTY manager (zsh/tmux/Codex) | P0 | Complete |
 | WebSocket streaming | P0 | Complete |
 | Reconnection + backpressure | P0 | Complete |
 | Bootstrap token auth + QR | P0 | Complete |
@@ -62,12 +62,12 @@ updated: 2026-03-12
 
 ### Session Persistence (tmux Control Mode)
 
-When tmux is installed, clsh uses **tmux control mode (`-CC`)** to wrap every `zsh` and `claude` session. The tmux layer is completely hidden. Users never interact with tmux directly. Control mode sends raw pane output as `%output` notifications, so xterm.js scrollback works perfectly (unlike normal tmux which sends screen redraws).
+When tmux is installed, clsh uses **tmux control mode (`-CC`)** to wrap every `zsh` and `codex` session. The tmux layer is completely hidden. Users never interact with tmux directly. Control mode sends raw pane output as `%output` notifications, so xterm.js scrollback works perfectly (unlike normal tmux which sends screen redraws).
 
 **Why it matters for the experience:**
 - Server restarts don't kill your sessions, they survive in tmux
 - On restart, clsh rediscovers surviving tmux sessions and presents them in the grid with full scrollback
-- Long-running Claude Code sessions, builds, SSH connections all persist
+- Long-running Codex sessions, builds, SSH connections all persist
 - Combined with **ngrok static domain**, creates the "native app" feel: tap PWA icon → sessions are there
 
 **How it works:**
@@ -96,7 +96,7 @@ With a free ngrok static domain (`NGROK_STATIC_DOMAIN` in `.env`), clsh always c
 | Feature | Priority | Status |
 |---------|----------|--------|
 | Demo animation engine | P0 | Complete |
-| Demo scripts (terminal + Claude) | P0 | Complete |
+| Demo scripts (terminal + Codex) | P0 | Complete |
 | Landing page (phone mockup) | P0 | Complete |
 | Mode detection (demo/live) | P0 | Complete |
 
@@ -123,10 +123,10 @@ With a free ngrok static domain (`NGROK_STATIC_DOMAIN` in `.env`), clsh always c
 
 | Feature | Status |
 |---------|--------|
-| Claude bootstrap script | Not started |
+| Codex bootstrap script | Not started |
 | Environment sync (local ↔ remote) | Not started |
 | Fresh environment provisioning | Not started |
-| Multiple Claude Code instances | Not started |
+| Multiple Codex instances | Not started |
 
 ## Future: Teams (P2)
 
@@ -135,7 +135,7 @@ With a free ngrok static domain (`NGROK_STATIC_DOMAIN` in `.env`), clsh always c
 | Shared terminal sessions | Not started |
 | Presence indicators | Not started |
 | Team workspaces | Not started |
-| Parallel Claudes on different tasks | Not started |
+| Parallel Codex agents on different tasks | Not started |
 
 ## Key Differentiators
 
@@ -143,7 +143,7 @@ With a free ngrok static domain (`NGROK_STATIC_DOMAIN` in `.env`), clsh always c
 2. **Native app feel** — ngrok static domain + PWA = tap icon on phone, Mac is there. No QR, no re-auth, no setup.
 3. **Keyboard skins** — No other terminal app lets you customize your phone keyboard like painting a mechanical keyboard
 4. **tmux zoom grid** — See all sessions at a glance, zoom into any one
-5. **Claude bootstrap** (future) — One script sets up your entire dev environment on a remote machine
+5. **Codex bootstrap** (future) — One script sets up your entire dev environment on a remote machine
 6. **MacBook aesthetic** — Not a generic terminal. Looks and feels like your actual MacBook.
 
 ## Related

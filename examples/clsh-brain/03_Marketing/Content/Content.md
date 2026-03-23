@@ -23,7 +23,7 @@ Content strategy for open source launch and growth.
 
 - "One command. Your Mac is on your phone."
 - "I built a tool that turns your browser into a MacBook terminal"
-- "Claude Code on your phone — yes, really"
+- "Codex on your phone — yes, really"
 - The MacBook Pro frame UI is inherently screenshot-worthy
 
 ## Current State
@@ -41,9 +41,9 @@ Content strategy for open source launch and growth.
 | Scene | Frames | Description |
 |-------|--------|-------------|
 | Intro | 0–100 | iPhone frame + ASCII CLSH logo (exact landing page style) lines stagger in |
-| Grid | 80–260 | iPhone slides up, 2×2 tmux grid: claude, kubectl, gcloud, + new session |
+| Grid | 80–260 | iPhone slides up, 2×2 tmux grid: codex, kubectl, gcloud, + new session |
 | kubectl | 240–475 | iPhone frame + terminal, oh-my-zsh prompt, pods stream in, data flow diagram |
-| Claude Code | 455–710 | iPhone frame + MacBook keyboard (fixed: no longer cut off), refactor prompt, diff streams in live |
+| Codex | 455–710 | iPhone frame + MacBook keyboard (fixed: no longer cut off), refactor prompt, diff streams in live |
 | CTA | 690–800 | iPhone frame + ASCII logo + `npx clsh-dev` typewriter |
 
 ### iPhone Frame Design
@@ -51,7 +51,7 @@ Content strategy for open source launch and growth.
 - `PHONE_SCALE = 1920/852 ≈ 2.254` — phone fits exactly in video height (was 1080/393=2.748 which cut off the keyboard)
 - Phone renders at **886×1920** centered in 1080×1920 (97px dark margins on each side)
 - Dynamic Island, status bar, home indicator present in all scenes
-- Keyboard scene (SceneClaude): home indicator bar added below keyboard so it clears the rounded phone corners
+- Keyboard scene (SceneCodex): home indicator bar added below keyboard so it clears the rounded phone corners
 
 ### Commands
 ```bash
@@ -77,7 +77,7 @@ All content files are in `03_Marketing/Content/`:
 |------|-------------|--------|
 | [[x-thread-how-i-built-clsh]] | 13-tweet X thread, "How I Built clsh" | Ready |
 | [[hn-show-post]] | Show HN post — technical, concise | Ready |
-| [[reddit-posts]] | 5 subreddit posts (r/ClaudeAI LIVE, r/commandline, r/SideProject, r/programming, r/webdev) | r/ClaudeAI live, others pending |
+| [[reddit-posts]] | 5 subreddit posts (r/Codex LIVE, r/commandline, r/SideProject, r/programming, r/webdev) | r/Codex live, others pending |
 | [[threads-posts]] | 8 daily posts + reply templates for Threads (PRIMARY channel) | Ready |
 | [[product-hunt-listing]] | Full PH listing: tagline, description, maker comment, launch timeline | Ready |
 | [[blog-launch-post]] | ~1,700 word Dev.to/Hashnode technical deep-dive | Ready |
@@ -86,8 +86,8 @@ All content files are in `03_Marketing/Content/`:
 | [[story-a-conversation-that-actually-happened]] | Funny dialogue — skeptical friend gets won over | Ready |
 | [[post-ideas-bank]] | 40+ post ideas for Reddit, HN, and X with platform-specific notes | Ready |
 | [[facebook-linkedin-posts]] | Personal FB group + LinkedIn posts (English + Hebrew) | Ready |
-| [[blog-how-i-built-with-obsidian-claude]] | "I gave Claude Code a brain" blog post for Dev.to/Hashnode | Ready |
-| [[hn-obsidian-brain-post]] | HN post for Obsidian+Claude Code workflow | Ready |
+| [[blog-how-i-built-with-obsidian-codex]] | "I gave Codex a brain" blog post for Dev.to/Hashnode | Ready |
+| [[hn-obsidian-brain-post]] | HN post for Obsidian+Codex workflow | Ready |
 | [[social-obsidian-brain-all-platforms]] | All social posts for "brain" campaign (Reddit, X, Threads, LinkedIn, FB EN+HE) | Ready |
 
 ## "One Command" Announcement Campaign (2026-03-15)

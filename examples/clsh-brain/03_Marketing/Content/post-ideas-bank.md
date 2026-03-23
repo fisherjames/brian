@@ -41,7 +41,7 @@ Ongoing collection of post ideas organized by platform and angle. Pick, adapt, p
 ### r/SideProject
 | # | Title | Angle | Hook |
 |---|-------|-------|------|
-| 1 | "I built clsh because I kept walking away from my laptop mid-Claude Code session" | Origin story | Personal, relatable, Claude Code angle |
+| 1 | "I built clsh because I kept walking away from my laptop mid-Codex session" | Origin story | Personal, relatable, Codex angle |
 | 2 | "From idea to clsh.dev in 2 weeks: my solo open-source build" | Build-in-public | Timeline, decisions, stack choices, what went wrong |
 | 3 | "My side project has keyboard skins and I'm not sorry" | Fun / personality | Screenshots, the joy of unnecessary features |
 
@@ -51,11 +51,11 @@ Ongoing collection of post ideas organized by platform and angle. Pick, adapt, p
 | 1 | "Self-hosted terminal access from your phone — no cloud, no subscription, MIT license" | Self-hosted angle | Local-first, your machine, your data |
 | 2 | "clsh: access your homelab from your phone with a real terminal (not SSH + iOS keyboard)" | Homelab | Practical use case for homelab crowd |
 
-### r/ClaudeAI
+### r/Codex
 | # | Title | Angle | Hook |
 |---|-------|-------|------|
-| 1 | "I built a tool to monitor Claude Code sessions from my phone" | Claude-specific | Watch Claude work, ctrl+c if needed, type commands |
-| 2 | "Claude Code on your phone — actual terminal, not a chat interface" | Demo | Show Claude Code running in clsh on phone |
+| 1 | "I built a tool to monitor Codex sessions from my phone" | Codex-specific | Watch Codex work, ctrl+c if needed, type commands |
+| 2 | "Codex on your phone — actual terminal, not a chat interface" | Demo | Show Codex running in clsh on phone |
 
 ### r/ProgrammerHumor
 | # | Title | Angle | Hook |
@@ -82,7 +82,7 @@ Ongoing collection of post ideas organized by platform and angle. Pick, adapt, p
 > SSH + the iOS keyboard is miserable for anything beyond `ls`. clsh replaces the iOS keyboard with a real developer keyboard (6-row iOS-style default or MacBook layout — real modifier keys, arrows, tab), adds a tmux-style session grid with live colored previews, and runs on your actual machine via node-pty — so your aliases, your .zshrc, your tools all work. One command to set up (`npx clsh-dev`), no SSH key management. Sessions persist across restarts via tmux.
 
 **When someone mentions mobile terminal apps:**
-> I built something for this — clsh.dev. Open source, phone-first. The key insight was replacing the iOS keyboard entirely with a real developer keyboard (two layouts: iOS-style for fast typing, MacBook for full modifier keys). Real ctrl/cmd/opt, arrow keys, the works. Sessions persist via tmux. Works great for monitoring Claude Code / AI agent sessions too — real PTY, so everything terminal-based just works. One command: `npx clsh-dev`. Or try the demo on your phone at clsh.dev (no install needed).
+> I built something for this — clsh.dev. Open source, phone-first. The key insight was replacing the iOS keyboard entirely with a real developer keyboard (two layouts: iOS-style for fast typing, MacBook for full modifier keys). Real ctrl/cmd/opt, arrow keys, the works. Sessions persist via tmux. Works great for monitoring Codex / AI agent sessions too — real PTY, so everything terminal-based just works. One command: `npx clsh-dev`. Or try the demo on your phone at clsh.dev (no install needed).
 
 ---
 
@@ -96,7 +96,7 @@ Ongoing collection of post ideas organized by platform and angle. Pick, adapt, p
 | 3 | "The iOS keyboard is terminal abuse. I fixed it." + screenshot | Visual |
 | 4 | "My terminal has RGB now. Your move, VS Code." + skin screenshot | Fun |
 | 5 | "1 command. That's it. `npx clsh-dev`. Your Mac is now on your phone." | Punchy |
-| 6 | "Me: *walks away from laptop*\nClaude Code: *refactors everything*\nMe: *opens clsh on phone*\nMe: ctrl+c\nCrisis averted." | Meme format |
+| 6 | "Me: *walks away from laptop*\nCodex: *refactors everything*\nMe: *opens clsh on phone*\nMe: ctrl+c\nCrisis averted." | Meme format |
 | 7 | "Built a MacBook keyboard as a React component. Every key sends real terminal escape sequences. This was way harder than it sounds." + screenshot | Technical |
 | 8 | "The best part of clsh isn't the terminal. It's the feeling of your Mac in your pocket." | Emotional |
 | 9 | "Open source idea: what if your phone had a real terminal? Not a chat. Not a web IDE. A real, full terminal. That's clsh." | Manifesto |
@@ -109,8 +109,8 @@ Ongoing collection of post ideas organized by platform and angle. Pick, adapt, p
 | 2 | "5 things I learned building a phone-first terminal" | Listicle thread |
 | 3 | "The hardest part of clsh wasn't the terminal. It was the keyboard." | Deep-dive on keyboard component |
 | 4 | "Why I didn't use SSH" | Technical decision, node-pty vs SSH comparison |
-| 5 | "The future of clsh: remote machines, Claude bootstrap, and teams" | Vision / roadmap thread |
-| 6 | "I let Claude Code build 70% of clsh. Here's what happened." | AI-assisted development story (if true to your experience) |
+| 5 | "The future of clsh: remote machines, Codex bootstrap, and teams" | Vision / roadmap thread |
+| 6 | "I let Codex build 70% of clsh. Here's what happened." | AI-assisted development story (if true to your experience) |
 | 7 | "Keyboard skins for your terminal: the feature nobody asked for" | Fun thread with screenshots of each skin |
 
 ---
@@ -120,7 +120,7 @@ Ongoing collection of post ideas organized by platform and angle. Pick, adapt, p
 | Week | Monday | Wednesday | Friday |
 |------|--------|-----------|--------|
 | 1 | Launch: HN + r/commandline + X thread | r/programming + r/webdev | r/SideProject + r/selfhosted |
-| 2 | X: keyboard deep-dive thread | r/ClaudeAI + X one-liner | X: "conversation" story thread |
+| 2 | X: keyboard deep-dive thread | r/Codex + X one-liner | X: "conversation" story thread |
 | 3 | Blog: "Architecture of a phone terminal" → HN | X: skin screenshots | Reddit: community feedback request |
 | 4 | X: vision/roadmap thread | r/ProgrammerHumor meme post | X: build-in-public update |
 

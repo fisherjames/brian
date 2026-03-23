@@ -85,14 +85,14 @@ npx clsh-dev → Scan QR → Done.
 
 --- Getting Started ---
 
-1. Star the repo: github.com/my-claude-utils/clsh
+1. Star the repo: github.com/my-codex-utils/clsh
 2. Try the demo: clsh.dev (works without installing anything)
 3. Install: npx clsh-dev
-4. Read the docs: github.com/my-claude-utils/clsh#readme
+4. Read the docs: github.com/my-codex-utils/clsh#readme
 
 --- Quick Links ---
 
-GitHub: github.com/my-claude-utils/clsh
+GitHub: github.com/my-codex-utils/clsh
 Website: clsh.dev
 X: @clsh_dev
 
@@ -125,7 +125,7 @@ All skill levels welcome — documentation, testing, and code are all valuable.
 
 | Bot | Purpose | Setup Notes |
 |-----|---------|-------------|
-| **GitHub Bot** (official) | Post PR/issue notifications to #pull-requests and #bug-reports | Connect via GitHub App, select my-claude-utils/clsh repo |
+| **GitHub Bot** (official) | Post PR/issue notifications to #pull-requests and #bug-reports | Connect via GitHub App, select my-codex-utils/clsh repo |
 | **MEE6** or **Carl-bot** | Auto-role assignment on join (Community role), welcome DMs | Free tier is sufficient |
 | **Disboard** | List server on Disboard for discoverability | Add after 30+ members |
 
@@ -154,7 +154,7 @@ Scan the QR code. You're in.
 
 Zero config. Zero signup. Zero cloud dependency.
 
-Star it: github.com/my-claude-utils/clsh
+Star it: github.com/my-codex-utils/clsh
 Try the demo: clsh.dev
 
 #opensource #terminal #devtools
@@ -184,7 +184,7 @@ Your Mac, in your pocket. Terminal access from your phone. Open source.
 
 **Content Theme**: Short demos of accessing a real terminal from a phone. "Wait, is that a real terminal on your phone?" hooks. Screen recordings of the MacBook frame UI. Side-by-side phone + laptop shots. Build-in-public clips. Keep it raw and authentic — no polish, just terminal vibes.
 
-### GitHub Organization (my-claude-utils)
+### GitHub Organization (my-codex-utils)
 
 **Organization Display Name**: `clsh`
 
@@ -203,7 +203,7 @@ Your Mac, in your pocket. Browser-based terminal access to your local machine fr
 
 **Profile Description**:
 ```
-Building clsh — open source terminal access from any device. Your Mac, in your pocket. github.com/my-claude-utils/clsh
+Building clsh — open source terminal access from any device. Your Mac, in your pocket. github.com/my-codex-utils/clsh
 ```
 
 ---
@@ -318,13 +318,13 @@ Note: Actual image creation is a manual step. These are specs for the designer/f
 - [ ] Set link to https://clsh.dev
 
 ### GitHub Organization
-- [ ] Create org "my-claude-utils" (if not already done)
+- [ ] Create org "my-codex-utils" (if not already done)
 - [ ] Set org display name to "clsh"
 - [ ] Set org description (copy from Section 2)
 - [ ] Set website to https://clsh.dev
 - [ ] Set location to "The Terminal"
 - [ ] Set org profile image (500x500 per spec)
-- [ ] Create repo my-claude-utils/clsh
+- [ ] Create repo my-codex-utils/clsh
 - [ ] Add repo description: "Your Mac, in your pocket. Browser-based terminal access from any device."
 - [ ] Add topics: terminal, developer-tools, xterm, websocket, open-source, remote-access
 - [ ] Set up GitHub Discussions on the repo
@@ -388,15 +388,15 @@ Thread: How we built real terminal access in the browser
 Shipping soon as open source.
 ```
 
-**Teaser 5 — Claude Code angle** (X)
+**Teaser 5 — Codex angle** (X)
 ```
-Claude Code is incredible.
+Codex is incredible.
 
 But you can't monitor a long-running session from your phone.
 
 Until now.
 
-[Screenshot of Claude Code pane in clsh, viewed on mobile]
+[Screenshot of Codex pane in clsh, viewed on mobile]
 ```
 
 ### Launch Day Posts
@@ -412,7 +412,7 @@ npx clsh-dev
 Scan QR → Done.
 Zero config. Zero signup.
 
-Star it: github.com/my-claude-utils/clsh
+Star it: github.com/my-codex-utils/clsh
 Try the demo: clsh.dev
 
 #opensource #devtools #terminal
@@ -423,7 +423,7 @@ Try the demo: clsh.dev
 What you get:
 - Root shell pane
 - tmux session pane
-- Claude Code pane
+- Codex pane
 - MacBook Pro frame UI
 - Auto ngrok tunnel with QR code
 - Magic link auth (no passwords)
@@ -436,14 +436,14 @@ MIT licensed. Local-first. No cloud required.
 ```
 Title: Show HN: clsh -- Browser-based terminal access to your local machine from any device
 
-clsh gives you three real terminal panes (root shell, tmux, Claude Code) in a MacBook Pro frame UI, accessible from any device through an auto-generated ngrok tunnel.
+clsh gives you three real terminal panes (root shell, tmux, Codex) in a MacBook Pro frame UI, accessible from any device through an auto-generated ngrok tunnel.
 
-I built this because I wanted to monitor Claude Code sessions from my phone while walking around. SSH felt too heavy, and there was nothing that gave me real PTY access with a good mobile UI.
+I built this because I wanted to monitor Codex sessions from my phone while walking around. SSH felt too heavy, and there was nothing that gave me real PTY access with a good mobile UI.
 
 Tech stack: React + xterm.js (WebGL) on the frontend, Node.js + node-pty + Express + ws on the backend. Auth via magic links (JWT + Resend). SQLite for local state. Auto-tunneled via ngrok SDK.
 
 Try the demo (no install): https://clsh.dev
-GitHub: https://github.com/my-claude-utils/clsh
+GitHub: https://github.com/my-codex-utils/clsh
 
 MIT licensed. Feedback welcome.
 ```
@@ -458,14 +458,14 @@ Title: I built an open source tool to access my terminal from any device (phone,
 **Product Hunt**
 ```
 Tagline: Your Mac, in your pocket.
-Description: Browser-based terminal access to your local machine from any device. Three real terminal panes in a MacBook Pro frame — root shell, tmux, and Claude Code — streaming live over WebSocket.
+Description: Browser-based terminal access to your local machine from any device. Three real terminal panes in a MacBook Pro frame — root shell, tmux, and Codex — streaming live over WebSocket.
 ```
 
 **Discord — #announcements**
 ```
 @everyone clsh v0.1.0 is live!
 
-GitHub: github.com/my-claude-utils/clsh
+GitHub: github.com/my-codex-utils/clsh
 Demo: clsh.dev
 
 Give it a star, try it out, and let us know what you think in #general.

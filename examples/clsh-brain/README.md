@@ -4,15 +4,15 @@
 
 ## the problem
 
-Every time you start a new Claude Code session, it forgets everything. Your architecture decisions, your product roadmap, which bugs you fixed yesterday, what's left on the sprint. You spend the first 10 minutes of every session re-explaining context that existed 30 minutes ago.
+Every time you start a new Codex session, it forgets everything. Your architecture decisions, your product roadmap, which bugs you fixed yesterday, what's left on the sprint. You spend the first 10 minutes of every session re-explaining context that existed 30 minutes ago.
 
 I got tired of it.
 
 ## the solution
 
-I turned an Obsidian vault into a persistent brain for Claude Code. Not a prompt template. Not a system message. A full company structure with departments, execution plans, agent personas, and custom commands, all wired into Claude Code via `CLAUDE.md` and the `.claude/` directory.
+I turned an Obsidian vault into a persistent brain for Codex. Not a prompt template. Not a system message. A full company structure with departments, execution plans, agent personas, and workflow commands, all wired into Codex via `AGENTS.md`, repo notes, and `brain-tree-os`.
 
-The result: 34 sessions across 6 days. Zero context loss between any of them. Claude picked up exactly where it left off every single time.
+The result: 34 sessions across 6 days. Zero context loss between any of them. Codex picked up exactly where it left off every single time.
 
 This is that vault.
 
@@ -20,9 +20,8 @@ This is that vault.
 
 ```
 clsh-brain/
-├── .claude/
-│   ├── agents/           # 7 AI agent personas (rnd-lead, backend-engineer, etc.)
-│   └── commands/         # 8 custom slash commands (/resume, /wrap-up, etc.)
+├── Agents/               # 7 AI agent personas (rnd-lead, backend-engineer, etc.)
+├── Commands/             # Example workflow command prompts and notes
 ├── 00_Company/           # Identity, vision, mission
 ├── 01_RnD/               # Architecture decisions, frontend, backend, infra, devops
 ├── 02_Product/           # MVP definition, roadmap, features, UI spec
@@ -32,29 +31,29 @@ clsh-brain/
 ├── 06_Legal/             # Licensing, privacy, security
 ├── Handoffs/             # Session handoff notes (context transfer between sessions)
 ├── Templates/            # Reusable note templates
-├── CLAUDE.md             # Main agent instructions (Claude Code reads this automatically)
+├── AGENTS.md             # Main agent instructions (Codex reads this automatically)
 ├── Execution-Plan.md     # Step-by-step build plan with dependencies + parallel groups
 └── VAULT-INDEX.md        # Navigation hub for the entire vault
 ```
 
-## the commands
+## the workflow commands
 
-These live in `.claude/commands/` and are available as slash commands in Claude Code:
+The Codex-friendly workflow is:
 
 | Command | What it does |
 |---------|-------------|
-| `/resume` | Reads execution plan + latest handoff, identifies unblocked steps, suggests what to work on next |
-| `/wrap-up` | Updates execution plan, vault files, creates handoff note for next session |
-| `/plan [step]` | Plans implementation for a specific execution plan step |
-| `/sprint [week]` | Plans a week's worth of work with parallel groups |
-| `/status` | Dashboard view of progress across all departments |
-| `/vault-sync` | Syncs vault files with latest project state |
-| `/new-feature [name]` | Plans and implements a new feature end-to-end |
-| `/bug-fix [bug]` | Structured debugging workflow |
+| `brain-tree-os resume` | Reads execution plan + latest handoff, then tells Codex what files to load first |
+| `brain-tree-os wrap-up` | Creates the next handoff template and keeps session continuity explicit |
+| `brain-tree-os plan [step]` | Creates a linked planning note for a specific execution-plan step |
+| `brain-tree-os sprint` | Creates a sprint note from ready and in-progress work |
+| `brain-tree-os status` | Shows the current brain or all registered brains |
+| `brain-tree-os sync` | Audits graph health, broken links, and disconnected notes |
+| `brain-tree-os feature [name]` | Creates a linked feature spec note |
+| Codex `/plan` | Turns one of the created notes into an in-chat implementation plan |
 
 ## agent personas
 
-Seven agent personas in `.claude/agents/`, each specialized for their domain:
+Seven agent personas in `Agents/`, each specialized for their domain:
 
 | Agent | Role |
 |-------|------|
@@ -110,32 +109,32 @@ Each agent works in an isolated git worktree so they don't conflict. The leader 
 - Full monorepo with 4 packages (agent, web, cli, landing)
 - Published to npm (`npx clsh-dev`)
 - Launched on all social platforms
-- Reddit post went viral on r/ClaudeAI
+- Reddit post went viral on r/Codex
 - Phone-first terminal with custom keyboard, 6 skins, tmux persistence
 - All security audit findings (4 critical, 9 high) resolved
 
 ## how to use this for YOUR project
 
 1. **Clone this repo** into your project workspace
-2. **Edit `CLAUDE.md`** with your project's description, tech stack, and context
+2. **Edit `AGENTS.md`** with your project's description, tech stack, and context
 3. **Edit `VAULT-INDEX.md`** with your project's departments and status
 4. **Edit `Execution-Plan.md`** with your build steps, dependencies, and parallel groups
-5. **Customize the agents** in `.claude/agents/` for your team structure
-6. **Start a Claude Code session** in the vault directory
-7. **Run `/resume`** to see what's next
-8. **End every session with `/wrap-up`** to preserve context
+5. **Customize the agents** in `Agents/` for your team structure
+6. **Start a Codex session** in the vault directory
+7. **Run `brain-tree-os resume`** to see what to read next
+8. **End every session with `brain-tree-os wrap-up`** to preserve context
 
-The key insight: Claude Code automatically reads `CLAUDE.md` when you open a session. That file points to the execution plan, which points to the departments, which point to the specific files. The entire vault becomes Claude's persistent memory.
+The key insight: `AGENTS.md`, the execution plan, and the folder indexes give Codex a repeatable context path. The entire vault becomes Codex's persistent memory.
 
 ## what's next
 
-We're building something bigger. A platform that generates these brains automatically, lets you visualize them as interactive graphs, and integrates directly with Claude Code via MCP.
+We're building something bigger. A platform that generates these brains automatically, lets you visualize them as interactive graphs, and integrates directly with Codex via MCP.
 
 It's called [neurotree.ai](https://neurotree.ai). Sign up for early access.
 
 ## links
 
 - [clsh.dev](https://clsh.dev) - the tool built with this brain
-- [clsh on GitHub](https://github.com/my-claude-utils/clsh) - the source code
-- [Blog: I gave Claude Code a brain](https://dev.to/nadav_avisrur/i-gave-claude-code-a-brain-heres-what-happened-3304) - the full story
+- [clsh on GitHub](https://github.com/my-codex-utils/clsh) - the source code
+- [Blog: I gave Codex a brain](https://dev.to/nadav_avisrur/i-gave-codex-code-a-brain-heres-what-happened-3304) - the full story
 - [neurotree.ai](https://neurotree.ai) - the platform (coming soon)

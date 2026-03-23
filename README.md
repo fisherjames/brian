@@ -201,7 +201,7 @@ BrainTree maps onto Codex like this:
 
 ## Hooks
 
-I still do not have evidence for a supported Codex hook file format comparable to Claude-style pre/post tool hooks. BrainTree therefore does not claim hook parity. The supported workflow uses:
+I still do not have evidence for a supported Codex hook file format comparable to the older agent-specific pre/post tool hook model. BrainTree therefore does not claim hook parity. The supported workflow uses:
 - Codex native slash commands
 - `brain-tree-os` shell commands
 - repository brain files

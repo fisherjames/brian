@@ -11,7 +11,7 @@ Market trends and insights for remote development tools.
 ## Market Trends
 
 1. **Remote dev tools growing** — Codespaces, Gitpod, code-server all gaining traction
-2. **AI coding assistants mainstream** — Claude Code, Cursor, Copilot Chat
+2. **AI coding assistants mainstream** — Codex, Cursor, Copilot Chat
 3. **Mobile development interest rising** — Developers want to work from anywhere
 4. **Open source dev tools thriving** — Community-driven tools winning over commercial
 

@@ -11,13 +11,13 @@ updated: 2026-03-12
 
 ## Core Insight
 
-clsh isn't just "terminal access from your phone." It's the feeling of having your 13-inch MacBook open in front of you — keyboard, tmux sessions, Claude Code instances — all running on a remote machine, controlled from your phone. No iOS keyboard. A real keyboard. A real terminal. Real development.
+clsh isn't just "terminal access from your phone." It's the feeling of having your 13-inch MacBook open in front of you — keyboard, tmux sessions, Codex instances — all running on a remote machine, controlled from your phone. No iOS keyboard. A real keyboard. A real terminal. Real development.
 
 ## The Experience
 
 ### What You See
 
-**Zoomed out (Grid View)**: You see 2-4 terminal cards in a grid, like looking at your tmux sessions from far away. Each card shows a running Claude Code instance, a shell, or tmux — with live output scrolling. You can see what's happening across all sessions at a glance.
+**Zoomed out (Grid View)**: You see 2-4 terminal cards in a grid, like looking at your tmux sessions from far away. Each card shows a running Codex instance, a shell, or tmux — with live output scrolling. You can see what's happening across all sessions at a glance.
 
 **Zoomed in (Terminal View)**: Tap any card to zoom into a full-screen terminal. The bottom half is a pixel-perfect MacBook keyboard — not the iOS keyboard, a real keyboard with fn, ctrl, cmd, arrows, the whole thing. The top half is your terminal running on the remote machine.
 
@@ -27,7 +27,7 @@ clsh isn't just "terminal access from your phone." It's the feeling of having yo
 
 - Like you're looking at your open MacBook from across the room (grid view)
 - Like you're sitting at your laptop typing (zoomed-in view with real keyboard)
-- Like Claude is your pair programmer sitting next to you, working while you watch from the couch
+- Like Codex is your pair programmer sitting next to you, working while you watch from the couch
 
 ## The Perfect Experience
 
@@ -43,7 +43,7 @@ WITH TMUX:     Restart server → sessions survive → pick up where you left of
 ```
 
 This matters because:
-- **Long-running Claude Code sessions** don't vanish when you restart the server
+- **Long-running Codex sessions** don't vanish when you restart the server
 - **Builds, SSH connections, running processes** survive across restarts
 - **Your phone's grid view** shows the same sessions after a reboot — content intact, scroll position preserved
 - **Zero friction** — `brew install tmux` once, never think about it again
@@ -80,7 +80,7 @@ Restart the server, reboot your Mac, doesn't matter. Tap the icon on your phone 
 
 ### Phase 1: Local Tunnel (MVP — NOW)
 Your Mac → ngrok tunnel → phone browser
-- Unlimited PTY sessions (zsh, tmux, Claude Code) in a grid
+- Unlimited PTY sessions (zsh, tmux, Codex) in a grid
 - QR code to connect (first time) or PWA bookmark (every time after)
 - tmux session persistence — sessions survive server restarts
 - Demo mode for landing page
@@ -93,17 +93,17 @@ Terminal output → auto-detect localhost URLs → expose via existing tunnel
 
 ### Phase 2: Remote Machines (NEXT)
 Cloud VM → always-on → accessible from anywhere
-- Claude runs a bootstrap script you provide
+- Codex runs a bootstrap script you provide
 - Script duplicates your local environment to the remote machine (dotfiles, repos, configs)
 - Everything stays synced between local and remote
-- You don't do anything — just install and run Claude with the script
+- You don't do anything — just install and run Codex with the script
 - Fresh environment capability — not just your laptop, any project
 
 ### Phase 3: Teams
 Multiple developers → shared remote → collaborative terminals
 - Start solo, advance to team workspaces
 - Shared terminal sessions with presence indicators
-- Multiple Claude Code instances working in parallel on different tasks
+- Multiple Codex instances working in parallel on different tasks
 
 ## UI Design Principles
 
@@ -123,7 +123,7 @@ Multiple developers → shared remote → collaborative terminals
 
 The desktop view is a pixel-perfect MacBook Pro frame with:
 - macOS menu bar with live clock
-- Three panes side by side (zsh | tmux | Claude Code)
+- Three panes side by side (zsh | tmux | Codex)
 - tmux status bar at the bottom
 - Traffic lights, notch with camera dot
 - Fullscreen toggle
@@ -132,15 +132,15 @@ The desktop view is a pixel-perfect MacBook Pro frame with:
 
 All mockups are in `Docs/`:
 - **mockup-1-grid.html** — Grid view with 4 session cards (2×2), tmux status bar, zoom-on-tap, new session button
-- **mockup-2-terminal-keyboard.html** — Zoomed-in terminal with full MacBook keyboard, touchbar, tmux tabs, Claude Code session
+- **mockup-2-terminal-keyboard.html** — Zoomed-in terminal with full MacBook keyboard, touchbar, tmux tabs, Codex session
 - **mockup-3-skin-studio.html** — Skin selection UI with 5 themes, live keyboard preview, per-key color painter, import/export
-- **index (1).html** — Full MacBook Pro desktop view with 3-pane Claude Code experience, pixel-perfect UI, streaming terminal output, interactive command input
+- **index (1).html** — Full MacBook Pro desktop view with 3-pane Codex experience, pixel-perfect UI, streaming terminal output, interactive command input
 
 ## Key Differentiators
 
 1. **Keyboard skins** — No other terminal app lets you customize your phone keyboard like painting a mechanical keyboard
 2. **tmux zoom grid** — See all your sessions at a glance, zoom into any one
-3. **Claude bootstrap** — One script sets up your entire development environment on a remote machine
+3. **Codex bootstrap** — One script sets up your entire development environment on a remote machine
 4. **Environment sync** — Your local and remote always match
 5. **MacBook aesthetic** — Not a generic terminal. It looks and feels like your actual MacBook.
 
@@ -153,7 +153,7 @@ Solo Developer               →  Team
 1-4 terminal sessions           Shared workspaces
 Personal keyboard skins         Team presence
 Local → Remote sync             Shared repos
-Claude Code solo                Multiple Claudes collaborating
+Codex solo                Multiple Codex agents collaborating
 ```
 
 ## Related

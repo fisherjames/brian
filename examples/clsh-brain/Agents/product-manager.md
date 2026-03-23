@@ -33,6 +33,6 @@ tools:
 
 - MVP: Three-pane terminal + auth + ngrok + demo mode + landing page
 - Demo mode: Zero backend needed — pre-scripted animations in browser
-- Target: Developers, Claude Code users, mobile-first developers
+- Target: Developers, Codex users, mobile-first developers
 - Business model: Open source (MIT) → cloud-hosted machines (future SaaS)
 - Three packages: agent (backend), web (frontend), cli (npx bootstrap)

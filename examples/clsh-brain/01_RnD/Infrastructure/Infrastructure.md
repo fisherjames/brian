@@ -37,7 +37,7 @@ Two features combine to make clsh feel like a native app — not a web hack:
 
 ### 1. Session Persistence (tmux Control Mode)
 
-When tmux is installed, clsh uses **tmux control mode (`-CC`)** to wrap every `zsh` and `claude` session. Control mode sends raw pane output as structured `%output` notifications instead of screen redraws, which means xterm.js gets the original byte stream and **scrollback works perfectly**.
+When tmux is installed, clsh uses **tmux control mode (`-CC`)** to wrap every `zsh` and `codex` session. Control mode sends raw pane output as structured `%output` notifications instead of screen redraws, which means xterm.js gets the original byte stream and **scrollback works perfectly**.
 
 ```
 WITHOUT TMUX:  node-pty → zsh               → dies with server
@@ -46,7 +46,7 @@ WITH TMUX:     node-pty → tmux -CC → zsh    → tmux survives server restart
 
 **Why it matters:**
 - Restart clsh → sessions survive → grid shows the same sessions with scrollback
-- Long-running Claude Code sessions, builds, SSH connections all persist
+- Long-running Codex sessions, builds, SSH connections all persist
 - Mac reboot → start server → sessions reappear (tmux sessions survive in background)
 - `brew install tmux` once, that's the entire setup
 - Falls back gracefully to raw PTY if tmux isn't installed
@@ -139,7 +139,7 @@ Force a specific method: `TUNNEL=ssh npx clsh-dev` or `TUNNEL=local npx clsh-dev
 1. HTTPS transport (ngrok or SSH tunnel — encrypted)
 2. Bootstrap token (256-bit random, SHA-256 hashed, reusable for same device)
 3. JWT sessions (8h expiry, httpOnly cookies via jose)
-4. Environment variable sanitization (strips NGROK_AUTHTOKEN, JWT_SECRET, RESEND_API_KEY, CLAUDECODE)
+4. Environment variable sanitization (strips NGROK_AUTHTOKEN, JWT_SECRET, RESEND_API_KEY, CODEX)
 5. Tunnel URL is unguessable (random subdomain unless static domain configured)
 
 ## SQLite Schema

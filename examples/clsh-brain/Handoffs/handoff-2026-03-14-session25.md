@@ -12,7 +12,7 @@ session_number: 25
 - Provided full posting guide (captions, hashtags, platform assignments, posting order)
 - Discussed Reddit posting strategy (4 subreddits, staggered over 2 days)
 - Discussed HN posting strategy — discovered Show HN restricted for new accounts
-- Fixed HN title: shortened to 71 chars ("Show HN: clsh – Real terminal on your phone (works with Claude Code)")
+- Fixed HN title: shortened to 71 chars ("Show HN: clsh – Real terminal on your phone (works with Codex)")
 - Removed AI references from r/commandline post body (Rule 5: no AI-generated posts, Rule 7: no AI projects)
 - **User posted on all socials**: Reddit (r/commandline, r/SideProject, r/programming, r/webdev), Instagram, X, Threads, Discord
 - Researched dev influencers for DM outreach with personalized pitch angles

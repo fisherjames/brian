@@ -132,7 +132,7 @@ DesktopApp.tsx
       ├── MacBookScreen.tsx
       │    ├── TerminalPane.tsx (zsh)
       │    ├── TerminalPane.tsx (tmux)
-      │    └── ClaudeCodePane.tsx
+      │    └── CodexCodePane.tsx
       ├── NotchIndicator.tsx
       └── TmuxStatusBar.tsx
 ```
@@ -280,7 +280,7 @@ Key height: 32px, same styling as keyboard keys but taller container row.
 | F5 | `\x1b[15~` | Refresh in vim, etc. |
 | commit | `git commit -m ""` + position cursor | Smart macro |
 | diff | `git diff` + Enter | |
-| plan | Opens Claude plan mode (custom macro) | Sends configured prefix |
+| plan | Opens Codex plan mode (custom macro) | Sends configured prefix |
 | ==== | `====\n` | Separator in commit messages / notes |
 
 ### MacBookKeyboard
@@ -578,7 +578,7 @@ src/
  │    │    ├── DesktopApp.tsx
  │    │    ├── MacBookFrame.tsx
  │    │    ├── MenuBar.tsx
- │    │    └── ClaudeCodePane.tsx
+ │    │    └── CodexCodePane.tsx
  │    └── shared/
  │         ├── TerminalPane.tsx
  │         ├── TrafficLights.tsx

@@ -13,7 +13,7 @@ Search engine optimization for clsh.dev.
 - "remote terminal access"
 - "browser terminal"
 - "access terminal from phone"
-- "Claude Code remote"
+- "Codex remote"
 - "web-based terminal"
 - "terminal QR code"
 - "mobile terminal access"

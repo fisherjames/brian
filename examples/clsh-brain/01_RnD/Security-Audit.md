@@ -174,7 +174,7 @@ The `ws` library defaults to 100MB max payload. An authenticated attacker can se
 **File**: `packages/agent/src/ws-handler.ts` (lines 143-216)
 **Risk**: Process table / memory exhaustion
 
-An authenticated client can create unlimited PTY sessions. Each spawns a real process (zsh, claude, tmux). No limit is enforced.
+An authenticated client can create unlimited PTY sessions. Each spawns a real process (zsh, codex, tmux). No limit is enforced.
 
 **Fix**: Add `MAX_SESSIONS = 8` check in `PTYManager.create()`.
 

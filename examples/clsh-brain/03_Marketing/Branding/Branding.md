@@ -13,7 +13,7 @@ Visual identity for clsh.
 - **Name**: clsh (pronounced "clash" or "C-L-S-H")
 - **Tagline**: "Your Mac, in your pocket."
 - **Mascot**: Orange pixel-art pig (SVG at `assets/pig-mascot.svg`)
-- **Primary color**: Orange `#f97316` (matches Claude Code cursor)
+- **Primary color**: Orange `#f97316` (matches Codex cursor)
 - **Background**: Near-black `#060606`
 - **Font**: JetBrains Mono (terminal), system fonts (UI)
 

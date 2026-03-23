@@ -14,10 +14,10 @@ Social media presence across key platforms for open source developer tool launch
 |----------|--------|----------|--------|---------|
 | Discord | clsh.dev | P0 | Not created | Community hub, support, contributors |
 | X (Twitter) | @clsh_dev | P0 | Not created | Build in public, dev audience, launch |
-| GitHub | my-claude-utils/clsh | P0 | Not created | Code, issues, discussions, stars |
+| GitHub | my-codex-utils/clsh | P0 | Not created | Code, issues, discussions, stars |
 | Instagram | @clsh.dev | P1 | Not created | Visual content, terminal aesthetics |
 | TikTok | @clsh.dev | P1 | Not created | Short-form video demos |
-| Reddit | u/your-reddit-username | P1 | Active (low karma) | r/ClaudeAI, r/commandline, r/SideProject, r/programming, r/webdev |
+| Reddit | u/your-reddit-username | P1 | Active (low karma) | r/Codex, r/commandline, r/SideProject, r/programming, r/webdev |
 | Hacker News | — | P0 | Not created | Show HN launch post |
 | Product Hunt | clsh | P0 | Not created | Launch day listing |
 
@@ -35,13 +35,13 @@ Social media presence across key platforms for open source developer tool launch
 
 ## Current State
 
-Multiple platforms live. **Threads is the breakout channel** (100 followers, 100+ likes in 24h). X/IG/TikTok have zero traction. Reddit low engagement (3 comments on r/ClaudeAI).
+Multiple platforms live. **Threads is the breakout channel** (100 followers, 100+ likes in 24h). X/IG/TikTok have zero traction. Reddit low engagement (3 comments on r/Codex).
 
 ### Performance Snapshot (2026-03-15)
 | Platform | Followers | Best Post | Engagement | Strategy |
 |----------|-----------|-----------|------------|----------|
 | Threads | ~100 | 100+ likes, comments, reposts | HIGH | Double down, post daily |
-| Reddit | 0 | 3 comments on r/ClaudeAI | LOW | Comment on others' posts first |
+| Reddit | 0 | 3 comments on r/Codex | LOW | Comment on others' posts first |
 | X | 0 | No traction | NONE | Cross-post Threads content |
 | Instagram | 0 | No traction | NONE | Pause until video content ready |
 | TikTok | 0 | No traction | NONE | Pause until video content ready |
@@ -58,8 +58,8 @@ Multiple platforms live. **Threads is the breakout channel** (100 followers, 100
 - **Account**: u/your-reddit-username (created 2026-03-14)
 - **r/SideProject**: Posted, REMOVED by Reddit spam filter (too AI-structured)
 - **r/commandline**: Posted, appears live
-- **r/ClaudeAI**: Posted 2026-03-14, LIVE (approved! "built with Claude" framing + educational tone passed filters)
-- **Note**: Low karma didn't block r/ClaudeAI. The key was matching their rules (built with Claude, how Claude helped, free to try).
+- **r/Codex**: Posted 2026-03-14, LIVE (approved! "built with Codex" framing + educational tone passed filters)
+- **Note**: Low karma didn't block r/Codex. The key was matching their rules (built with Codex, how Codex helped, free to try).
 - **Strategy**: See [[reddit-posts]] for updated posting order and lessons learned
 
 ## Campaigns
@@ -80,9 +80,9 @@ Multiple platforms live. **Threads is the breakout channel** (100 followers, 100
 - [x] Register @clsh_dev on X (Twitter)
 - [x] Register @clsh.dev on Instagram
 - [x] Register @clsh.dev on TikTok
-- [x] Create GitHub repo (my-claude-utils/clsh)
+- [x] Create GitHub repo (my-codex-utils/clsh)
 - [x] Set up Linktree (linktr.ee/clsh.dev)
-- [x] Post to r/ClaudeAI (LIVE 2026-03-14)
+- [x] Post to r/Codex (LIVE 2026-03-14)
 - [ ] Repost to r/SideProject (casual tone, after karma)
 - [ ] Post to r/programming + r/webdev
 - [ ] Plan Product Hunt launch

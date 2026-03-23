@@ -16,7 +16,7 @@ Minimum viable product for open source launch.
 ### P0 — Must Have for Launch
 
 #### Backend
-- [x] PTY manager (zsh + tmux + Claude Code sessions)
+- [x] PTY manager (zsh + tmux + Codex sessions)
 - [x] WebSocket streaming with reconnection + backpressure
 - [x] Bootstrap token auth with QR code
 - [x] JWT session management (jose, 8h expiry)
@@ -42,7 +42,7 @@ Two optional but transformative features make clsh feel like a native app:
 
 #### Frontend — Desktop
 - [x] MacBook Pro frame UI (pixel-perfect bezel, notch, traffic lights)
-- [x] Three-pane layout (zsh | tmux | Claude Code)
+- [x] Three-pane layout (zsh | tmux | Codex)
 - [x] tmux status bar, macOS menu bar with live clock
 
 #### Frontend — Phone (Primary Experience)
@@ -76,9 +76,9 @@ Two optional but transformative features make clsh feel like a native app:
 ### P2 — Remote Machines & Teams
 
 - [ ] **Remote machine support** — Cloud VM, always-on, accessible from anywhere
-- [ ] **Claude bootstrap script** — One script duplicates your local environment to remote
+- [ ] **Codex bootstrap script** — One script duplicates your local environment to remote
 - [ ] **Environment sync** — Local and remote always match (dotfiles, repos, configs)
-- [ ] **Multiple Claude instances** — Parallel Claude Code sessions working on different tasks
+- [ ] **Multiple Codex instances** — Parallel Codex sessions working on different tasks
 - [ ] **Team workspaces** — Shared terminal sessions with presence indicators
 - [ ] File sync between local and remote
 - [ ] Usage-based billing

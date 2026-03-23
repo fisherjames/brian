@@ -107,7 +107,7 @@ git checkout main && git pull && git branch -d fix/something
 
 ## Session 19 (2026-03-14) — Git Push + OSS Prep
 
-- **Git initialized**: Local user `my-claude-utils <your-org-email@example.com>`, pushed to `my-claude-utils/clsh`
+- **Git initialized**: Local user `my-codex-utils <your-org-email@example.com>`, pushed to `my-codex-utils/clsh`
 - **Branch protection**: PRs required (enforce admins), CI required (`Lint, Typecheck, Build` Node 20+22), linear history, no force push, no branch delete
 - **Repo settings**: Wiki disabled, squash merge only (PR title as commit), auto-delete merged branches, 10 topics
 - **First release**: `v0.1.0` (2026-03-15)

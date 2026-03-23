@@ -8,12 +8,12 @@ You are an AI agent working on the clsh.dev project vault. This file is your pri
 
 **Core value prop**: Your Mac, in your pocket. But way more than that. One command to start: `npx clsh-dev`.
 
-**Vision**: See `02_Product/Vision.md` for the full product vision — phone UI, MacBook keyboard, keyboard skins, remote machines, Claude bootstrap, solo→teams progression.
+**Vision**: See `02_Product/Vision.md` for the full product vision — phone UI, MacBook keyboard, keyboard skins, remote machines, Codex bootstrap, solo→teams progression.
 
 ## Target Users
 
 - Developers who want terminal access from their phone/tablet
-- Claude Code users who want to monitor sessions remotely
+- Codex users who want to monitor sessions remotely
 - Developers working across multiple devices
 - Mobile-first developers who want real terminal access on the go
 
@@ -45,8 +45,8 @@ You are an AI agent working on the clsh.dev project vault. This file is your pri
 | `Handoffs/` | Session handoff notes (one per session, dated) |
 | `Templates/` | Reusable note templates |
 | `Docs/` | Source documents (Complete Technical Plan) |
-| `.claude/agents/` | Agent persona files |
-| `.claude/commands/` | Custom Claude Code commands |
+| `Agents/` | Agent persona files |
+| `Commands/` | Example command prompts and workflow notes |
 
 ## Project Context
 
@@ -54,11 +54,11 @@ You are an AI agent working on the clsh.dev project vault. This file is your pri
 - **Primary UX**: Phone with MacBook keyboard (not iOS keyboard), tmux grid, keyboard skins
 - **Secondary UX**: Desktop with MacBook Pro frame, three-pane layout
 - **Business model**: Open source (MIT) → future cloud-hosted remote machines (paid SaaS)
-- **Architecture**: Local-first MVP with ngrok tunneling → remote machines with Claude bootstrap → teams
+- **Architecture**: Local-first MVP with ngrok tunneling → remote machines with Codex bootstrap → teams
 - **MVP scope**: Agent (PTY + WebSocket + auth) + Web (xterm.js + MacBook UI) + Landing page + Demo mode
 - **Monorepo**: `packages/agent`, `packages/web`, `packages/cli`, `apps/landing`
 - **Domain**: clsh.dev
-- **GitHub**: my-claude-utils/clsh
+- **GitHub**: my-codex-utils/clsh
 - **Stage**: Phase 4 (Launch) — 88% complete (21/24 steps)
 
 ## Research Sources
@@ -84,15 +84,10 @@ The Execution Plan defines **Parallel Groups** — steps that can run simultaneo
 
 ### How It Works
 
-1. **`/resume-clsh`** identifies all currently unblocked steps and their parallel groups
-2. A team is created with `TeamCreate` (e.g., `team_name: "clsh-phase1b"`)
-3. Tasks are created with `TaskCreate` for each parallel step
-4. Agents are spawned with the `Task` tool using:
-   - `team_name` matching the team
-   - `subagent_type: "general-purpose"` for implementation work
-   - `isolation: "worktree"` when multiple agents edit the same repo (prevents conflicts)
-5. Agents work independently, mark tasks complete via `TaskUpdate`
-6. Leader merges worktrees and updates the Execution Plan
+1. **`brain-tree-os resume`** identifies the files Codex should load first
+2. **`brain-tree-os plan <step>`** or Codex **`/plan`** is used to break work into concrete tasks
+3. If multiple tracks are possible, create isolated branches or worktrees outside the brain itself
+4. Work is merged back, then the execution plan and handoff notes are updated
 
 ### Worktree Rules
 
@@ -103,21 +98,21 @@ The Execution Plan defines **Parallel Groups** — steps that can run simultaneo
 
 ### Handoff Protocol
 
-Every session MUST end with `/wrap-up-clsh` which:
+Every session MUST end with `brain-tree-os wrap-up` which:
 1. Updates `Execution-Plan.md` step statuses and progress percentages
 2. Updates `VAULT-INDEX.md` with current department statuses
 3. Creates `Handoffs/handoff-YYYY-MM-DD.md` with context for next session
 4. Notes which steps are now unblocked by completed work
 
-## Custom Commands
+## Workflow Commands
 
 | Command | Purpose |
 |---------|---------|
-| `/plan-clsh [step]` | Plan implementation for a specific step |
-| `/wrap-up-clsh` | Complete a session, update vault, create handoff |
-| `/resume-clsh` | Resume from where you left off |
-| `/sprint-clsh [week]` | Plan the week's steps |
-| `/clsh-status` | Check progress across all departments |
-| `/vault-sync-clsh` | Sync changes to vault files |
-| `/new-feature-clsh [feature]` | Plan and implement a new feature |
-| `/bug-fix-clsh [bug]` | Debug and fix a bug |
+| `brain-tree-os plan [step]` | Create a linked plan note for a specific step |
+| `brain-tree-os wrap-up` | Complete a session, update vault, create a handoff template |
+| `brain-tree-os resume` | Resume from where you left off |
+| `brain-tree-os sprint` | Plan the week's steps |
+| `brain-tree-os status` | Check progress across all departments |
+| `brain-tree-os sync` | Audit graph health and disconnected notes |
+| `brain-tree-os feature [feature]` | Create a feature planning note |
+| Codex `/plan` | Turn the notes above into a concrete implementation plan |

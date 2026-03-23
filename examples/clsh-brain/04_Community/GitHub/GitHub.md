@@ -10,8 +10,8 @@ GitHub organization and repository management.
 
 ## Repository Setup
 
-- **Org**: github.com/my-claude-utils
-- **Main repo**: my-claude-utils/clsh
+- **Org**: github.com/my-codex-utils
+- **Main repo**: my-codex-utils/clsh
 - **License**: MIT
 - **Branch protection**: require reviews + passing CI on main
 
@@ -42,8 +42,8 @@ Not created
 
 ## TODO
 
-- [ ] Create GitHub organization my-claude-utils
-- [ ] Create repository my-claude-utils/clsh
+- [ ] Create GitHub organization my-codex-utils
+- [ ] Create repository my-codex-utils/clsh
 - [ ] Set up issue and PR templates
 - [ ] Configure branch protection rules
 - [ ] Enable Discussions

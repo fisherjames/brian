@@ -12,7 +12,7 @@ created: 2026-03-15
 
 ```
 # Today (3 commands):
-git clone https://github.com/my-claude-utils/clsh.git
+git clone https://github.com/my-codex-utils/clsh.git
 cd clsh
 npm install && npm run dev
 ```
@@ -179,7 +179,7 @@ For a permanent URL that survives restarts, set up ngrok (free):
   Saved to ~/.clsh/config.json
 
   Done! Run `npx clsh-dev` to start with your permanent URL.
-  Guide: https://github.com/my-claude-utils/clsh/blob/main/docs/ngrok-setup.md
+  Guide: https://github.com/my-codex-utils/clsh/blob/main/docs/ngrok-setup.md
 ```
 
 ### Step 7: Ngrok Setup Guide (`docs/ngrok-setup.md`)
@@ -245,7 +245,7 @@ New: "One command. Real terminal on your phone."
 
 Old quickstart:
 ```bash
-git clone https://github.com/my-claude-utils/clsh.git
+git clone https://github.com/my-codex-utils/clsh.git
 cd clsh
 npm install
 npm run dev
@@ -296,7 +296,7 @@ npx clsh-dev
 
 | # | File |
 |---|------|
-| 27 | `CLAUDE.md` (vault) |
+| 27 | `AGENTS.md` (vault) |
 | 28 | `00_Company/Company.md` |
 | 29 | `00_Company/Vision-Mission.md` |
 | 30 | `02_Product/Vision.md` |

@@ -33,7 +33,7 @@ tools:
 
 ## Technical Context
 
-- Target audience: Developers, Claude Code users, indie hackers
+- Target audience: Developers, Codex users, indie hackers
 - Key hook: "Your Mac, in your pocket" — terminal from phone is novel and screenshot-worthy
 - Primary channels: Hacker News (Show HN), Product Hunt, X (build in public), Reddit
 - MacBook Pro frame UI is inherently shareable — leverage for viral content

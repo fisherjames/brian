@@ -43,8 +43,8 @@ Build and launch the core open-source tool with phone-first design.
 
 > Cloud VM → always-on → accessible from anywhere
 
-- [ ] **Claude bootstrap script** — You provide a script, Claude runs it on a remote machine to duplicate your local environment (dotfiles, repos, configs)
-- [ ] **Environment sync** — Your local and remote always match. You don't do anything — just install and run Claude with the script.
+- [ ] **Codex bootstrap script** — You provide a script, Codex runs it on a remote machine to duplicate your local environment (dotfiles, repos, configs)
+- [ ] **Environment sync** — Your local and remote always match. You don't do anything — just install and run Codex with the script.
 - [ ] **Fresh environments** — Not just your laptop — any project, any stack
 - [ ] Cloudflare Worker proxy (`api.clsh.dev`)
 - [ ] Usage-based billing design
@@ -56,7 +56,7 @@ Build and launch the core open-source tool with phone-first design.
 
 - [ ] **Shared workspaces** — Multiple developers in the same terminal session
 - [ ] **Presence indicators** — See who's in which session
-- [ ] **Multiple Claude Code instances** — Parallel Claudes working on different tasks
+- [ ] **Multiple Codex instances** — Parallel Codex agents working on different tasks
 - [ ] Team keyboard skins and customization
 - [ ] Shared repos and environment templates
 
@@ -69,7 +69,7 @@ Solo Developer               →  Team
 1-4 terminal sessions           Shared workspaces
 Personal keyboard skins         Team presence
 Local → Remote sync             Shared repos
-Claude Code solo                Multiple Claudes collaborating
+Codex solo                Multiple Codex agents collaborating
 ```
 
 ## Related

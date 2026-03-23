@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Reworked the CLI around a Codex-first flow: `init`, `resume`, `wrap-up`, and `status`
-- Removed viewer prompts and docs that pointed users at Claude-specific commands or hidden directories
+- Removed viewer prompts and docs that pointed users at the older agent-specific command and hidden-directory workflow
 - Switched brain discovery and card metrics to Codex-facing files such as `AGENTS.md` and `Agents/`
 
 ## [0.1.3] - 2026-03-22

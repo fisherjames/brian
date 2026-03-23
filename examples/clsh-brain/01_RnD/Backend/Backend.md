@@ -13,7 +13,7 @@ Node.js agent that spawns PTY sessions and streams them over WebSocket through n
 - **Node.js 20+** with ESM modules
 - **Express** for HTTP + SSE endpoints
 - **ws** for WebSocket handling
-- **node-pty** for real PTY sessions (zsh, tmux, claude)
+- **node-pty** for real PTY sessions (zsh, tmux, codex)
 - **better-sqlite3** for session/token storage (WAL mode)
 - **@ngrok/ngrok** SDK for programmatic tunnel creation
 - **jose** for JWT signing/verification
@@ -65,7 +65,7 @@ WITH TMUX:     node-pty → tmux -CC → zsh    (tmux survives restart, scrollba
 
 **Key details:**
 - tmux is invisible (no status bar, no prefix key, `~/.clsh/tmux.conf`)
-- Only `zsh` and `claude` shell types are wrapped; `tmux` shell type NOT wrapped (avoids tmux-in-tmux)
+- Only `zsh` and `codex` shell types are wrapped; `tmux` shell type NOT wrapped (avoids tmux-in-tmux)
 - Session metadata (id, tmux_name, shell, name, cwd) persisted in SQLite `pty_sessions` table
 - On startup: `rediscoverAll()` reads DB → reattaches surviving tmux sessions → kills zombies
 - Graceful shutdown (`destroyAll`): kills control mode clients but leaves tmux alive
