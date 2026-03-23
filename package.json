@@ -17,7 +17,7 @@
     "brain",
     "ai",
     "project-management",
-    "claude",
+    "codex",
     "agents",
     "obsidian",
     "open-source"
@@ -27,7 +27,6 @@
   },
   "files": [
     "packages/cli/dist/",
-    "packages/cli/commands/",
     "packages/web/.next/",
     "!packages/web/.next/cache/",
     "!packages/web/.next/standalone/",

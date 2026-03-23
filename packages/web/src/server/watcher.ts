@@ -31,9 +31,8 @@ export function startWatcher(brainId: string, ws: WebSocket): WatcherHandle {
 
   const watcher = chokidar.watch(brainPath, {
     ignored: [
-      /(^|[/\\])\../, // hidden files (except we want .claude)
+      /(^|[/\\])\../, // hidden files
       /node_modules/,
-      '!**/.claude/**',
     ],
     persistent: true,
     ignoreInitial: true,

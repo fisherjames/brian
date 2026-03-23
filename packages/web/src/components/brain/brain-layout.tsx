@@ -57,7 +57,7 @@ export function BrainLayout({
   const { files, links, executionSteps, handoffs, connectionStatus, isStreaming, optimisticUpdateStep } =
     useBrainRealtime(brainId, initialData);
 
-  // Brain is "building" when it has very few files (init-braintree is running)
+  // Brain is "building" when it has very few files and the initial scaffold is still being created.
   const isBuilding = !isDemo && files.length > 0 && files.length < 5;
 
   const [sidebarOpen, setSidebarOpen] = useState(true);

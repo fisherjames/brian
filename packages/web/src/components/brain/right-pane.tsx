@@ -203,7 +203,7 @@ function StepRow({
 function ResumeBrainCta() {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
-  const cmd = 'claude /resume-braintree';
+  const cmd = 'npx brain-tree-os resume && codex';
 
   function handleCopy(e: React.MouseEvent) {
     e.stopPropagation();
@@ -220,7 +220,7 @@ function ResumeBrainCta() {
       >
         <Terminal className="h-4 w-4 shrink-0 text-text-muted" />
         <span className="flex-1 text-[12px] font-semibold text-text">
-          Continue with Claude
+          Continue with Codex
         </span>
         {open ? (
           <ChevronDown className="h-3.5 w-3.5 shrink-0 text-text-muted" />
@@ -232,7 +232,7 @@ function ResumeBrainCta() {
       {open && (
         <div className="mt-1.5 rounded-xl border border-border bg-bg-section px-3 pb-3 pt-2.5">
           <p className="text-[11px] leading-relaxed text-text-secondary mb-2.5">
-            Pick up where you left off. Run this in your terminal:
+            Pick up where you left off. Run this in the project terminal:
           </p>
           <div className="flex items-center gap-1.5 rounded-lg bg-[#2B2A25] px-3 py-2.5">
             <code className="flex-1 text-[13px] font-mono text-[#E8E6E0]">
