@@ -23,6 +23,12 @@ repo/
     ├── operations/
     ├── commands/
     ├── agents/
+    ├── org/
+    ├── initiatives/
+    ├── discussions/
+    ├── decisions/
+    ├── briefings/
+    ├── tasks/
     ├── handoffs/
     ├── templates/
     └── assets/
@@ -55,13 +61,19 @@ cd /path/to/project
 brian init
 ```
 
-3. Start a managed Codex session:
+3. Run the canonical V2 lifecycle:
 
 ```bash
-brian next
+brian intent "Improve onboarding conversion"
+brian propose "Onboarding conversion initiative"
+brian shape initiative-xxxx
+brian plan initiative-xxxx
+brian work
+brian brief
+brian decide initiative-xxxx "Approve rollout to 25%"
 ```
 
-4. For a non-trivial feature:
+4. Compatibility flow for legacy execution-plan/team-board:
 
 ```bash
 brian mission "Feature Name"
@@ -99,6 +111,13 @@ The installed skill pack includes:
 ## Commands
 
 - `brian` starts the viewer
+- `brian intent "<text>"` captures initiative intent (V2)
+- `brian propose "<name>"` creates proposal-stage initiative (V2)
+- `brian shape <initiative-id>` moves initiative to shaping stage (V2)
+- `brian plan <initiative-id>` plans initiative execution (V2)
+- `brian brief` generates a director briefing (V2)
+- `brian decide <initiative-id> "<title>"` records a director decision (V2)
+- `brian doctrine-lint` validates governance and pipeline hygiene (V2)
 - `brian next` shows one recommended next command
 - `brian work [--role <role>]` launches Codex with the managed start prompt
 - `brian end [--role <role>]` creates the handoff and launches the managed wrap-up prompt
@@ -109,7 +128,7 @@ The installed skill pack includes:
 - `brian wrap-up` creates the next handoff template
 - `brian notes "<scope>"` reconciles downstream notes after top-level edits
 - `brian migrate` converts an old layout into `brian/` + `.brian/`
-- `brian plan [step]` creates a linked planning note
+- `brian plan [step]` is V2-first; use `EP-*` ids for legacy execution-plan step notes
 - `brian sprint` creates a sprint note from ready/in-progress work
 - `brian sync` audits links and parent relationships
 - `brian spec "<name>"` creates a feature spec packet
@@ -118,12 +137,21 @@ The installed skill pack includes:
 
 ## Workflow Philosophy
 
-Brian now follows a spec-first loop influenced by the strongest parts of `spec-kit` style workflows:
+Brian V2 is initiative-first and decision-first (with spec-kit style discipline):
 
-- start from an explicit spec packet (`spec.md`, `plan.md`, `tasks.md`, `review.md`)
-- make execution-plan and team-board updates deterministic from that spec
-- optimize for one clear next action (`brian next`) instead of command guessing
+- start from intent and proposal, not a flat task list
+- use discussion and decision records as visible reasoning
+- derive execution tasks only after shaping/planning
 - keep implementation and operational memory in-repo and link-valid
+
+## V2 Viewer Flag
+
+V2 Director Console is currently parallelized behind a feature flag:
+
+- set `NEXT_PUBLIC_BRIAN_V2=1` before starting the viewer
+- or open a brain with `?v2=1`
+
+V1 remains runnable during migration.
 
 ## Parallel Work
 

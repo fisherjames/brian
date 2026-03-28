@@ -620,6 +620,19 @@ function readTeamBoardSteps(brainRoot: string): BrainStep[] {
 }
 
 function recommendNextAction(brainRoot: string): { command: string; reason: string } {
+  const v2Initiatives = listV2Initiatives(brainRoot)
+  if (v2Initiatives.length > 0) {
+    const stageOrder: V2Stage[] = ['intent', 'proposal', 'leadership_discussion', 'director_decision', 'tribe_shaping', 'squad_planning', 'execution']
+    const active = [...v2Initiatives].sort((a, b) => stageOrder.indexOf(a.stage) - stageOrder.indexOf(b.stage))[0]
+    if (active) {
+      if (active.stage === 'intent') return { command: `brian propose "${active.title}"`, reason: `${active.id} is at intent stage.` }
+      if (active.stage === 'proposal') return { command: `brian shape ${active.id}`, reason: `${active.id} needs tribe shaping.` }
+      if (active.stage === 'tribe_shaping') return { command: `brian plan ${active.id}`, reason: `${active.id} needs squad planning.` }
+      if (active.stage === 'squad_planning') return { command: 'brian work', reason: `${active.id} is ready for execution.` }
+      if (active.stage === 'execution') return { command: 'brian brief', reason: `${active.id} is executing; generate a director briefing.` }
+    }
+  }
+
   const parsed = readExecutionPlanSteps(brainRoot)
   const defaultAction = { command: 'brian work', reason: 'Continue focused implementation work.' }
   if (!parsed || parsed.steps.length === 0) return defaultAction
@@ -796,6 +809,137 @@ function appendMissionTeamBoard(brainRoot: string, featureName: string, stepId: 
   return stepNumber
 }
 
+function ensureV2Docs(brainRoot: string) {
+  const dirs = [
+    path.join(brainRoot, 'brian', 'org'),
+    path.join(brainRoot, 'brian', 'initiatives'),
+    path.join(brainRoot, 'brian', 'discussions'),
+    path.join(brainRoot, 'brian', 'decisions'),
+    path.join(brainRoot, 'brian', 'briefings'),
+    path.join(brainRoot, 'brian', 'tasks'),
+  ]
+  for (const dir of dirs) fs.mkdirSync(dir, { recursive: true })
+
+  const indexes: Array<[string, string]> = [
+    [path.join(brainRoot, 'brian', 'org', 'index.md'), '# org\n\n> Part of [[index]]\n\n'],
+    [path.join(brainRoot, 'brian', 'initiatives', 'index.md'), '# initiatives\n\n> Part of [[index]]\n\n'],
+    [path.join(brainRoot, 'brian', 'discussions', 'index.md'), '# discussions\n\n> Part of [[index]]\n\n'],
+    [path.join(brainRoot, 'brian', 'decisions', 'index.md'), '# decisions\n\n> Part of [[index]]\n\n'],
+    [path.join(brainRoot, 'brian', 'briefings', 'index.md'), '# briefings\n\n> Part of [[index]]\n\n'],
+    [path.join(brainRoot, 'brian', 'tasks', 'index.md'), '# tasks\n\n> Part of [[index]]\n\n'],
+  ]
+  for (const [filePath, content] of indexes) writeFileIfMissing(filePath, content)
+}
+
+type V2Stage = 'intent' | 'proposal' | 'leadership_discussion' | 'director_decision' | 'tribe_shaping' | 'squad_planning' | 'execution'
+
+function writeInitiativeRecord(brainRoot: string, payload: { id: string; title: string; stage: V2Stage; summary?: string }) {
+  ensureV2Docs(brainRoot)
+  const filePath = path.join(brainRoot, 'brian', 'initiatives', `${payload.id}.md`)
+  const now = isoNow()
+  const body = [
+    '---',
+    `id: ${payload.id}`,
+    `title: ${payload.title}`,
+    `stage: ${payload.stage}`,
+    `summary: ${payload.summary ?? ''}`,
+    `created_at: ${now}`,
+    `updated_at: ${now}`,
+    '---',
+    '',
+    `# ${payload.title}`,
+    '',
+    '## Stage',
+    payload.stage,
+    '',
+    '## Summary',
+    payload.summary ?? '',
+    '',
+  ].join('\n')
+  fs.writeFileSync(filePath, body, 'utf8')
+  updateFileIfExists(path.join(brainRoot, 'brian', 'initiatives', 'index.md'), (content) => {
+    const link = `- [[${payload.id}]]`
+    return content.includes(link) ? content : `${content.trimEnd()}\n${link}\n`
+  })
+  return filePath
+}
+
+function listV2Initiatives(brainRoot: string): Array<{ id: string; title: string; stage: V2Stage; path: string }> {
+  const dir = path.join(brainRoot, 'brian', 'initiatives')
+  if (!fs.existsSync(dir)) return []
+  return fs.readdirSync(dir)
+    .filter((file) => file.endsWith('.md') && file !== 'index.md')
+    .map((file) => {
+      const full = path.join(dir, file)
+      const raw = fs.readFileSync(full, 'utf8')
+      const title = raw.match(/^title:\s+(.+)$/m)?.[1]?.trim() || file.replace(/\.md$/, '')
+      const stage = (raw.match(/^stage:\s+(.+)$/m)?.[1]?.trim() || 'intent') as V2Stage
+      return { id: file.replace(/\.md$/, ''), title, stage, path: full }
+    })
+}
+
+function v2EventLogPath(brainRoot: string): string | null {
+  const meta = readBrainMeta(brainRoot)
+  if (!meta?.id) return null
+  return path.join(CONFIG_DIR, 'state', meta.id, 'events.ndjson')
+}
+
+function appendV2Event(brainRoot: string, payload: {
+  actor: string
+  layer: 'squad' | 'tribe' | 'director' | 'system'
+  stage: V2Stage
+  kind: string
+  message: string
+  initiativeId?: string
+}) {
+  const eventPath = v2EventLogPath(brainRoot)
+  if (!eventPath) return
+  fs.mkdirSync(path.dirname(eventPath), { recursive: true })
+  const event = {
+    id: crypto.randomUUID(),
+    at: isoNow(),
+    actor: payload.actor,
+    layer: payload.layer,
+    stage: payload.stage,
+    kind: payload.kind,
+    message: payload.message,
+    initiativeId: payload.initiativeId,
+    refs: [],
+  }
+  fs.appendFileSync(eventPath, `${JSON.stringify(event)}\n`, 'utf8')
+}
+
+function createDecisionRecord(brainRoot: string, payload: { title: string; initiativeId?: string; rationale?: string; status?: 'pending' | 'approved' | 'rejected' }) {
+  ensureV2Docs(brainRoot)
+  const id = `decision-${crypto.randomUUID().slice(0, 8)}`
+  const filePath = path.join(brainRoot, 'brian', 'decisions', `${id}.md`)
+  fs.writeFileSync(
+    filePath,
+    [
+      '---',
+      `id: ${id}`,
+      `title: ${payload.title}`,
+      `initiative_id: ${payload.initiativeId ?? ''}`,
+      `status: ${payload.status ?? 'pending'}`,
+      `rationale: ${payload.rationale ?? ''}`,
+      `at: ${isoNow()}`,
+      '---',
+      '',
+      `# ${payload.title}`,
+      '',
+      '## Rationale',
+      payload.rationale ?? '',
+      '',
+    ].join('\n'),
+    'utf8'
+  )
+  updateFileIfExists(path.join(brainRoot, 'brian', 'decisions', 'index.md'), (content) => {
+    const link = `- [[${id}]]`
+    return content.includes(link) ? content : `${content.trimEnd()}\n${link}\n`
+  })
+  return { id, filePath }
+}
+
 function wikilinkTargetExists(target: string, relativeFiles: string[], byBaseName: Map<string, string>): boolean {
   const trimmed = target.trim().replace(/\.md$/i, '')
   if (byBaseName.has(trimmed)) return true
@@ -820,9 +964,16 @@ function commandPromptSummary(brainRoot: string) {
   console.log('  - /status    Show Codex session configuration and token usage')
   console.log('')
   console.log('  Brian workflow commands live in the shell:')
+  console.log('  - brian intent "<initiative intent>"')
+  console.log('  - brian propose "<initiative title>"')
+  console.log('  - brian shape <initiative-id>')
+  console.log('  - brian plan <initiative-id>        (or `brian plan EP-2` for legacy execution-plan step planning)')
   console.log('  - brian next')
   console.log('  - brian work [--role <role>]')
   console.log('  - brian end [--role <role>]')
+  console.log('  - brian brief')
+  console.log('  - brian decide <initiative-id> "<decision title>"')
+  console.log('  - brian doctrine-lint')
   console.log('  - brian status')
   console.log('  - brian mission <feature>')
   console.log('  - brian init')
@@ -896,6 +1047,12 @@ function managedMarkdownRelativePaths(): string[] {
     path.join('brian', 'commands', 'end-loop.md'),
     path.join('brian', 'agents', 'agents.md'),
     path.join('brian', 'agents', 'project-operator.md'),
+    path.join('brian', 'org', 'index.md'),
+    path.join('brian', 'initiatives', 'index.md'),
+    path.join('brian', 'discussions', 'index.md'),
+    path.join('brian', 'decisions', 'index.md'),
+    path.join('brian', 'briefings', 'index.md'),
+    path.join('brian', 'tasks', 'index.md'),
     path.join('brian', 'assets', 'assets.md'),
     path.join('brian', 'templates', 'templates.md'),
     path.join('brian', 'templates', 'handoff-template.md'),
@@ -1025,6 +1182,12 @@ function injectPackageScripts(brainRoot: string, preset: InitPreset) {
   const scripts = typeof packageJson.scripts === 'object' && packageJson.scripts ? packageJson.scripts : {}
   const additions: Record<string, string> = {
     'brain:viewer': 'brian',
+    'brain:intent': 'brian intent',
+    'brain:propose': 'brian propose',
+    'brain:shape': 'brian shape',
+    'brain:brief': 'brian brief',
+    'brain:decide': 'brian decide',
+    'brain:doctrine-lint': 'brian doctrine-lint',
     'brain:resume': 'brian resume',
     'brain:status': 'brian status',
     'brain:work': 'brian work',
@@ -1130,6 +1293,12 @@ function createBrainScaffold(brainRoot: string, options: InitOptions): BrainMeta
 - [[engineering]] - architecture, codebase structure, and technical decisions
 - [[operations]] - runbooks, workflows, release notes, and maintenance tasks
 ${hasCommands ? '- [[commands]] - repeatable Codex start, planning, note-sync, and wrap-up loops\n' : ''}- [[agents]] - Codex-facing operating rules and reusable role notes
+- [[org/index]] - director, tribe, squad, and role topology (V2)
+- [[initiatives/index]] - initiative pipeline artifacts (V2)
+- [[discussions/index]] - layered discussion records (V2)
+- [[decisions/index]] - decision records and tradeoffs (V2)
+- [[briefings/index]] - director briefings to the CEO (V2)
+- [[tasks/index]] - execution tasks derived from initiatives (V2)
 - [[specs]] - spec-first feature packets with plan, tasks, and review docs
 - [[handoffs]] - session continuity notes
 - [[templates]] - reusable templates for future sessions
@@ -1155,6 +1324,12 @@ ${hasCommands ? '- [[commands]] - repeatable Codex start, planning, note-sync, a
 - Read \`brian/index.md\`, \`brian/execution-plan.md\`, and the latest entry in \`brian/handoffs/\` before making non-trivial changes.
 - Open the relevant folder index before changing code or docs.
 ${hasCommands ? '- Open [[commands]] and the relevant role note in [[agents]] when using the richer Codex workflow layer.\n' : ''}- Prefer small, verifiable edits over speculative rewrites.
+
+## Workflow Contract
+- intent -> proposal -> leadership discussion -> director decision -> tribe shaping -> squad planning -> execution
+- no execution without a context packet
+- no unresolved discussion without an escalation record
+- every interaction must emit one of: answer | decision | task | risk | escalation
 
 ## Working Rules
 - Keep project-specific decisions in the brain files, not only in chat history.
@@ -1208,6 +1383,8 @@ ${hasCommands ? '- Open [[commands]] and the relevant role note in [[agents]] wh
 > Part of [[index]]
 
 ## Principles
+- Markdown is the system state. If it matters, it must be written.
+- Initiatives and decisions are primary; tasks are derived.
 - Intent before implementation for non-trivial work.
 - Multi-step refinement over one-shot generation (\`spec -> plan -> tasks -> review\`).
 - Keep [[execution-plan]], [[team-board]], and [[handoffs]] in sync.
@@ -1313,6 +1490,7 @@ Imported markdown docs from the repository should be linked here when you run in
 - Replace this with the real setup, run, test, and deploy commands for the project.
 - Capture any environment prerequisites or local services.
 ${options.addPackageScripts ? '\n## Helper Commands\n- `npm run brain:viewer`\n- `npm run brain:next`\n- `npm run brain:work`\n- `npm run brain:end`\n- `npm run brain:status`\n- `npm run brain:mission -- "Feature Name"`\n- `npm run brain:spec -- "Feature Name"`\n- `npm run brain:sync`\n- `npm run brain:wrap`\n- `npm run brain:notes -- "<scope>"`\n' : ''}
+${options.addPackageScripts ? '\n## Canonical V2 Commands\n- `npm run brain:intent -- "<initiative intent>"`\n- `npm run brain:propose -- "<initiative title>"`\n- `npm run brain:shape -- <initiative-id>`\n- `npm run brain:plan -- <initiative-id>`\n- `npm run brain:work`\n- `npm run brain:brief`\n- `npm run brain:decide -- <initiative-id> "<decision title>"`\n- `npm run brain:status`\n- `npm run brain:doctrine-lint`\n' : ''}
 ${options.installSkills ? '\n## Managed Skills\n- Brian installs a shared Codex skill pack under `~/.codex/skills/` for core work, roles, and team orchestration.\n' : ''}
 `)
 
@@ -1322,9 +1500,9 @@ ${options.installSkills ? '\n## Managed Skills\n- Brian installs a shared Codex 
 
 ${hasCommands
   ? `1. Read [[index]], \`AGENTS.md\`, [[execution-plan]], and the latest handoff.
-2. Run \`brian next\` to get one recommended action.
-3. Use [[commands]] for the canonical session workflow loops.
-4. Use \`brian mission "<feature>"\` for non-trivial feature work.
+2. Use initiative-centric commands as canonical flow: \`brian intent\`, \`brian propose\`, \`brian shape\`, \`brian plan\`, \`brian work\`, \`brian brief\`, \`brian decide\`, \`brian status\`.
+3. Use [[commands]] for compatibility and richer session loops when needed.
+4. Use \`brian mission "<feature>"\` for compatibility with legacy execution-plan/team-board workflows.
 5. Open the relevant area note before editing code or docs.
 6. Use \`brian notes "<scope>"\` after changing a top-level or workflow note.
 7. Keep queue items feature-length and worktree-mapped (\`feature/worktree/image/breaking\`).
@@ -1515,6 +1693,43 @@ ${body}
 Store screenshots, diagrams, PDFs, and other external reference material here.
 `)
 
+  writeFileIfMissing(path.join(docsRoot, 'org', 'index.md'), `# org
+
+> Part of [[index]]
+
+Document director, tribe, squad, and role structure here.
+`)
+  writeFileIfMissing(path.join(docsRoot, 'initiatives', 'index.md'), `# initiatives
+
+> Part of [[index]]
+
+Initiative proposals, shaped plans, and execution packets live here.
+`)
+  writeFileIfMissing(path.join(docsRoot, 'discussions', 'index.md'), `# discussions
+
+> Part of [[index]]
+
+Layered discussion records with unresolved questions and escalations.
+`)
+  writeFileIfMissing(path.join(docsRoot, 'decisions', 'index.md'), `# decisions
+
+> Part of [[index]]
+
+Decision records with rationale, tradeoffs, and owner.
+`)
+  writeFileIfMissing(path.join(docsRoot, 'briefings', 'index.md'), `# briefings
+
+> Part of [[index]]
+
+Director-to-CEO summaries and operating status.
+`)
+  writeFileIfMissing(path.join(docsRoot, 'tasks', 'index.md'), `# tasks
+
+> Part of [[index]]
+
+Execution tasks derived from initiatives and decisions.
+`)
+
   writeFileIfMissing(path.join(docsRoot, 'templates', 'templates.md'), `# templates
 
 > Part of [[index]]
@@ -1603,6 +1818,13 @@ function printStatus(brainRoot?: string) {
     if (meta) {
       console.log(`  Brain: ${meta.name}`)
       console.log(`  Path: ${brainRoot}`)
+      const initiatives = listV2Initiatives(brainRoot)
+      if (initiatives.length > 0) {
+        const byStage = new Map<string, number>()
+        for (const item of initiatives) byStage.set(item.stage, (byStage.get(item.stage) ?? 0) + 1)
+        console.log(`  V2 initiatives: ${initiatives.length}`)
+        console.log(`  V2 pipeline: ${Array.from(byStage.entries()).map(([stage, count]) => `${stage}=${count}`).join(', ')}`)
+      }
       const viewerUrl = formatViewerUrl(meta.id)
       if (viewerUrl) console.log(`  Viewer: ${viewerUrl}`)
       return
@@ -1748,6 +1970,66 @@ ${humanNow()}
   return handoffPath
 }
 
+function runDoctrineLint(brainRoot: string): { ok: boolean; issues: string[] } {
+  const issues: string[] = []
+  const agentsPath = path.join(brainRoot, 'AGENTS.md')
+  const constitutionPath = path.join(brainRoot, 'brian', 'constitution.md')
+  const initiativesDir = path.join(brainRoot, 'brian', 'initiatives')
+  const discussionsDir = path.join(brainRoot, 'brian', 'discussions')
+  const decisionsDir = path.join(brainRoot, 'brian', 'decisions')
+
+  const pipelineContract = 'intent -> proposal -> leadership discussion -> director decision -> tribe shaping -> squad planning -> execution'
+  const agentsContent = fs.existsSync(agentsPath) ? fs.readFileSync(agentsPath, 'utf8') : ''
+  const constitutionContent = fs.existsSync(constitutionPath) ? fs.readFileSync(constitutionPath, 'utf8') : ''
+
+  if (!agentsContent.toLowerCase().includes(pipelineContract)) {
+    issues.push('AGENTS.md missing hard workflow contract pipeline.')
+  }
+  if (!agentsContent.includes('every interaction must emit one of')) {
+    issues.push('AGENTS.md missing interaction output contract.')
+  }
+  if (!constitutionContent.toLowerCase().includes('markdown')) {
+    issues.push('constitution.md should explicitly assert markdown-first doctrine.')
+  }
+
+  if (!fs.existsSync(initiativesDir)) {
+    issues.push('brian/initiatives is missing.')
+  } else {
+    for (const file of fs.readdirSync(initiativesDir).filter((f) => f.endsWith('.md') && f !== 'index.md')) {
+      const raw = fs.readFileSync(path.join(initiativesDir, file), 'utf8')
+      if (!/^stage:\s+.+$/m.test(raw)) issues.push(`initiative missing stage metadata: ${file}`)
+    }
+  }
+
+  const discussions = fs.existsSync(discussionsDir)
+    ? fs.readdirSync(discussionsDir).filter((f) => f.endsWith('.md') && f !== 'index.md')
+    : []
+  const decisions = fs.existsSync(decisionsDir)
+    ? fs.readdirSync(decisionsDir).filter((f) => f.endsWith('.md') && f !== 'index.md')
+    : []
+
+  const unresolved = discussions.filter((file) => {
+    const raw = fs.readFileSync(path.join(discussionsDir, file), 'utf8')
+    const status = raw.match(/^status:\s+(.+)$/m)?.[1]?.trim() || 'open'
+    return status === 'open' || status === 'escalated'
+  })
+  if (unresolved.length > 0 && decisions.length === 0) {
+    issues.push('open discussions exist without any decision records.')
+  }
+
+  const eventPath = v2EventLogPath(brainRoot)
+  if (eventPath && fs.existsSync(eventPath)) {
+    const events = fs.readFileSync(eventPath, 'utf8').split('\n').filter(Boolean)
+    const merged = events.some((line) => line.includes('"kind":"merge_completed"'))
+    const verified = events.some((line) => line.includes('"kind":"verification_recorded"'))
+    if (merged && !verified) {
+      issues.push('merge_completed events found without verification_recorded event.')
+    }
+  }
+
+  return { ok: issues.length === 0, issues }
+}
+
 async function findFreePort(preferred: number): Promise<number> {
   return new Promise(resolve => {
     const server = net.createServer()
@@ -1801,9 +2083,9 @@ function showWelcome(port: number) {
   console.log('  |                                                             |')
   console.log('  |  1. Open that project in a terminal                         |')
   console.log('  |  2. Run: brian init                                         |')
-  console.log('  |  3. Run: brian work                                         |')
-  console.log('  |  4. Use brian end when you wrap up                          |')
-  console.log('  |  5. Optional in Codex: /plan or /status                     |')
+  console.log('  |  3. Run: brian intent "New initiative"                      |')
+  console.log('  |  4. Then: brian propose / brian shape / brian plan / work   |')
+  console.log('  |  5. Use brian brief + brian decide for director loop        |')
   console.log('  |                                                             |')
   console.log('  |  The brain will appear in the viewer automatically.         |')
   console.log('  +-------------------------------------------------------------+')
@@ -1818,6 +2100,12 @@ function showHelp() {
 
   Usage:
     brian                           Start the viewer
+    brian intent <text>             Capture initiative intent (V2)
+    brian propose <name>            Create proposal-stage initiative (V2)
+    brian shape <initiative-id>     Move initiative to tribe shaping stage (V2)
+    brian brief                     Generate director briefing note (V2)
+    brian decide <id> <title>       Record director decision (V2)
+    brian doctrine-lint             Validate workflow doctrine + governance hygiene (V2)
     brian next                      Show one recommended next command
     brian work                      Launch Codex with the managed Brian start prompt
     brian end                       Create a handoff and launch the managed wrap-up prompt
@@ -1828,7 +2116,7 @@ function showHelp() {
     brian wrap-up                   Create the next handoff template
     brian notes <scope>             Reconcile downstream notes after top-level edits
     brian migrate                   Move a legacy layout into brian/.brian
-    brian plan [step]               Create a step plan note for an execution-plan step
+    brian plan [step]               V2 initiative plan (default) or legacy execution-plan step plan
     brian sprint                    Create a sprint note from ready and in-progress work
     brian sync                      Scan the brain for broken links and disconnected files
     brian spec <name>               Create a spec packet under brian/specs/
@@ -1938,6 +2226,192 @@ async function main() {
     return
   }
 
+  if (command === 'intent') {
+    const brainRoot = findBrainRoot(process.cwd())
+    if (!brainRoot) {
+      console.log('  No brain found in this directory tree.')
+      console.log('  Run `brian init` first.')
+      return
+    }
+    const text = args.join(' ').trim()
+    if (!text) {
+      console.log('  Usage: brian intent <text>')
+      return
+    }
+    const id = `initiative-${crypto.randomUUID().slice(0, 8)}`
+    const note = writeInitiativeRecord(brainRoot, { id, title: text, stage: 'intent', summary: text })
+    appendV2Event(brainRoot, {
+      actor: 'project-operator',
+      layer: 'system',
+      stage: 'intent',
+      kind: 'initiative_created',
+      message: `intent captured: ${text}`,
+      initiativeId: id,
+    })
+    console.log(`  Intent captured: ${id}`)
+    console.log(`  Note: ${note}`)
+    return
+  }
+
+  if (command === 'propose') {
+    const brainRoot = findBrainRoot(process.cwd())
+    if (!brainRoot) {
+      console.log('  No brain found in this directory tree.')
+      console.log('  Run `brian init` first.')
+      return
+    }
+    const title = args.join(' ').trim()
+    if (!title) {
+      console.log('  Usage: brian propose <name>')
+      return
+    }
+    const id = `initiative-${crypto.randomUUID().slice(0, 8)}`
+    const note = writeInitiativeRecord(brainRoot, { id, title, stage: 'proposal', summary: title })
+    appendV2Event(brainRoot, {
+      actor: 'product-lead',
+      layer: 'tribe',
+      stage: 'proposal',
+      kind: 'initiative_created',
+      message: `proposal created: ${title}`,
+      initiativeId: id,
+    })
+    console.log(`  Proposal created: ${id}`)
+    console.log(`  Note: ${note}`)
+    return
+  }
+
+  if (command === 'shape') {
+    const brainRoot = findBrainRoot(process.cwd())
+    if (!brainRoot) {
+      console.log('  No brain found in this directory tree.')
+      console.log('  Run `brian init` first.')
+      return
+    }
+    const initiativeId = args[0]?.trim()
+    if (!initiativeId) {
+      console.log('  Usage: brian shape <initiative-id>')
+      return
+    }
+    const initiatives = listV2Initiatives(brainRoot)
+    const initiative = initiatives.find((item) => item.id === initiativeId)
+    if (!initiative) {
+      console.log(`  Initiative not found: ${initiativeId}`)
+      return
+    }
+    const note = writeInitiativeRecord(brainRoot, {
+      id: initiative.id,
+      title: initiative.title,
+      stage: 'tribe_shaping',
+      summary: `Shaped for implementation: ${initiative.title}`,
+    })
+    appendV2Event(brainRoot, {
+      actor: 'product-lead',
+      layer: 'tribe',
+      stage: 'tribe_shaping',
+      kind: 'task_planned',
+      message: `initiative shaped: ${initiative.title}`,
+      initiativeId: initiative.id,
+    })
+    console.log(`  Initiative shaped: ${initiative.id}`)
+    console.log(`  Note: ${note}`)
+    return
+  }
+
+  if (command === 'brief') {
+    const brainRoot = findBrainRoot(process.cwd())
+    if (!brainRoot) {
+      console.log('  No brain found in this directory tree.')
+      console.log('  Run `brian init` first.')
+      return
+    }
+    ensureV2Docs(brainRoot)
+    const initiatives = listV2Initiatives(brainRoot)
+    const pending = initiatives.filter((item) => item.stage !== 'execution')
+    const id = `briefing-${crypto.randomUUID().slice(0, 8)}`
+    const filePath = path.join(brainRoot, 'brian', 'briefings', `${id}.md`)
+    const summary = `Initiatives: ${initiatives.length}; pending progression: ${pending.length}`
+    fs.writeFileSync(
+      filePath,
+      [
+        '---',
+        `id: ${id}`,
+        `title: Director briefing ${new Date().toISOString().slice(0, 10)}`,
+        `summary: ${summary}`,
+        `published: false`,
+        `at: ${isoNow()}`,
+        '---',
+        '',
+        `# Director briefing`,
+        '',
+        `- ${summary}`,
+        '',
+      ].join('\n'),
+      'utf8'
+    )
+    updateFileIfExists(path.join(brainRoot, 'brian', 'briefings', 'index.md'), (content) => {
+      const link = `- [[${id}]]`
+      return content.includes(link) ? content : `${content.trimEnd()}\n${link}\n`
+    })
+    appendV2Event(brainRoot, {
+      actor: 'founder-ceo',
+      layer: 'director',
+      stage: 'director_decision',
+      kind: 'briefing_generated',
+      message: summary,
+    })
+    console.log(`  Briefing generated: ${filePath}`)
+    return
+  }
+
+  if (command === 'decide') {
+    const brainRoot = findBrainRoot(process.cwd())
+    if (!brainRoot) {
+      console.log('  No brain found in this directory tree.')
+      console.log('  Run `brian init` first.')
+      return
+    }
+    const initiativeId = args[0]?.trim()
+    const title = args.slice(1).join(' ').trim()
+    if (!initiativeId || !title) {
+      console.log('  Usage: brian decide <initiative-id> <title>')
+      return
+    }
+    const decision = createDecisionRecord(brainRoot, {
+      initiativeId,
+      title,
+      status: 'pending',
+      rationale: 'Decision captured via CLI.',
+    })
+    appendV2Event(brainRoot, {
+      actor: 'founder-ceo',
+      layer: 'director',
+      stage: 'director_decision',
+      kind: 'decision_recorded',
+      message: title,
+      initiativeId,
+    })
+    console.log(`  Decision recorded: ${decision.filePath}`)
+    return
+  }
+
+  if (command === 'doctrine-lint') {
+    const brainRoot = findBrainRoot(process.cwd())
+    if (!brainRoot) {
+      console.log('  No brain found in this directory tree.')
+      console.log('  Run `brian init` first.')
+      return
+    }
+    const result = runDoctrineLint(brainRoot)
+    if (result.ok) {
+      console.log('  Doctrine lint passed.')
+      return
+    }
+    console.log(`  Doctrine lint failed (${result.issues.length})`)
+    for (const issue of result.issues) console.log(`  - ${issue}`)
+    process.exitCode = 1
+    return
+  }
+
   if (command === 'status') {
     printStatus(findBrainRoot(process.cwd()) || undefined)
     return
@@ -1987,7 +2461,7 @@ async function main() {
     if (initOptions.linkExistingDocs) {
       console.log('  Existing docs: linked into brian/operations/existing-docs.md where possible')
     }
-    console.log('  Next: run `brian work` to start the first managed Codex session.')
+    console.log('  Next: run `brian intent "<initiative>"` then `brian propose "<title>"` to start the V2 lifecycle.')
     return
   }
 
@@ -2122,6 +2596,41 @@ async function main() {
       return
     }
 
+    const stepArg = args[0]
+    const initiatives = listV2Initiatives(brainRoot)
+    const looksLegacyStep = typeof stepArg === 'string' && /^ep-/i.test(stepArg)
+    const initiativeMatch = stepArg ? initiatives.find((item) => item.id.toLowerCase() === stepArg.toLowerCase()) : null
+
+    if (!looksLegacyStep && (initiativeMatch || (initiatives.length > 0 && stepArg && !/^ep-/i.test(stepArg)))) {
+      if (!stepArg) {
+        console.log('  Usage: brian plan <initiative-id>')
+        return
+      }
+      if (!initiativeMatch) {
+        console.log(`  Initiative not found: ${stepArg}`)
+        console.log('  Available initiatives:')
+        for (const item of initiatives.slice(0, 10)) console.log(`  - ${item.id}: ${item.title}`)
+        return
+      }
+      const notePath = writeInitiativeRecord(brainRoot, {
+        id: initiativeMatch.id,
+        title: initiativeMatch.title,
+        stage: 'squad_planning',
+        summary: `Planned execution scope for ${initiativeMatch.title}`,
+      })
+      appendV2Event(brainRoot, {
+        actor: 'project-operator',
+        layer: 'squad',
+        stage: 'squad_planning',
+        kind: 'task_planned',
+        message: `initiative planned: ${initiativeMatch.title}`,
+        initiativeId: initiativeMatch.id,
+      })
+      console.log(`  Initiative planned: ${initiativeMatch.id}`)
+      console.log(`  Note: ${notePath}`)
+      return
+    }
+
     const executionPlan = readExecutionPlanSteps(brainRoot)
     if (!executionPlan || executionPlan.steps.length === 0) {
       console.log('  No parseable execution plan found.')
@@ -2129,7 +2638,6 @@ async function main() {
       return
     }
 
-    const stepArg = args[0]
     const completedIds = new Set(
       executionPlan.steps.filter(step => step.status === 'completed').map(step => step.id)
     )
