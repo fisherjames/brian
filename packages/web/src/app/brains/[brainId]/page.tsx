@@ -1,35 +1,20 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { getBrain, getDemoBrainPath, DEMO_BRAIN, isDemoEnabled, scanBrainFiles, parseBrainLinks, getExecutionSteps, getHandoffs } from '@/lib/local-data'
+import { getBrain, scanBrainFiles, parseBrainLinks, getExecutionSteps, getHandoffs } from '@/lib/local-data'
 import { BrainLayout } from '@/components/brain/brain-layout'
 
 async function getBrainData(brainId: string) {
-  let brainPath: string
-  let brainName: string
-  let brainDescription: string
-  let isDemo = false
+  const brain = getBrain(brainId)
+  if (!brain) return null
 
-  if (brainId === 'demo') {
-    if (!isDemoEnabled()) return null
-    brainPath = getDemoBrainPath()
-    brainName = DEMO_BRAIN.name
-    brainDescription = DEMO_BRAIN.description
-    isDemo = true
-  } else {
-    const brain = getBrain(brainId)
-    if (!brain) return null
-    brainPath = brain.path
-    brainName = brain.name
-    brainDescription = brain.description
-  }
-
+  const brainPath = brain.path
   const files = scanBrainFiles(brainPath)
   const links = parseBrainLinks(brainPath, files)
   const executionSteps = getExecutionSteps(brainPath, files)
   const handoffs = getHandoffs(brainPath, files)
 
   return {
-    brain: { id: brainId, name: brainName, description: brainDescription, is_demo: isDemo },
+    brain: { id: brainId, name: brain.name, description: brain.description },
     files,
     links,
     executionSteps,
@@ -65,7 +50,6 @@ export default async function BrainPage({ params }: { params: Promise<{ brainId:
         links={links}
         executionSteps={executionSteps}
         handoffs={handoffs}
-        isDemo={brain.is_demo ?? false}
         brainName={brain.name}
         brainDescription={brain.description ?? ''}
       />

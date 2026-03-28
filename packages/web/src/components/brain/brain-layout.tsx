@@ -40,7 +40,7 @@ interface Handoff {
 interface BrainLayoutProps {
   brainId: string; files: BrainFile[]; links: BrainLink[];
   executionSteps: ExecutionStep[]; handoffs: Handoff[];
-  isDemo?: boolean; brainName?: string; brainDescription?: string;
+  brainName?: string; brainDescription?: string;
 }
 
 const GRAPH_TAB: Tab = { id: 'graph', label: 'Graph View' };
@@ -49,18 +49,18 @@ const TEAM_TAB: Tab = { id: 'team', label: 'Team Tracker' };
 export function BrainLayout({
   brainId, files: initialFiles, links: initialLinks,
   executionSteps: initialSteps, handoffs: initialHandoffs,
-  isDemo = false, brainName = '', brainDescription = '',
+  brainName = '', brainDescription = '',
 }: BrainLayoutProps) {
   const initialData = useMemo(() => ({
     files: initialFiles, links: initialLinks,
     executionSteps: initialSteps, handoffs: initialHandoffs,
   }), [initialFiles, initialLinks, initialSteps, initialHandoffs]);
 
-  const { files, links, executionSteps, handoffs, connectionStatus, isStreaming, optimisticUpdateStep } =
+  const { files, links, executionSteps, handoffs, connectionStatus, isStreaming, optimisticUpdateStep, refreshSnapshot } =
     useBrainRealtime(brainId, initialData);
 
-  // Brain is "building" when it has very few files and the initial scaffold is still being created.
-  const isBuilding = !isDemo && files.length > 0 && files.length < 5;
+  // Show build loader only while streaming initial scaffold updates.
+  const isBuilding = isStreaming && files.length > 0 && files.length < 5;
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [rightPaneOpen, setRightPaneOpen] = useState(false);
@@ -193,15 +193,6 @@ export function BrainLayout({
       <main className="flex flex-1 flex-col overflow-hidden">
         <TabBar tabs={tabs} activeTabId={activeTabId} onSelectTab={setActiveTabId} onCloseTab={handleCloseTab} onCloseOthers={handleCloseOthers} onCloseToRight={handleCloseToRight} />
 
-        {isDemo && (
-          <div className="flex items-center gap-2 border-b border-[var(--color-leaf)]/20 bg-[var(--color-leaf)]/[0.08] px-3 py-2 sm:px-4 sm:py-2.5">
-            <p className="flex-1 text-[12px] text-text-secondary sm:text-[13px]">
-              <span className="mr-1.5 inline-block rounded bg-[var(--color-leaf)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white sm:text-[11px]">Demo</span>{' '}
-              This is a demo brain from the <span className="font-semibold text-[var(--color-leaf)]">clsh.dev</span> project.
-            </p>
-          </div>
-        )}
-
         <div className="relative flex-1 overflow-y-auto">
           {activeTabId === 'graph' && (
             <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
@@ -222,7 +213,12 @@ export function BrainLayout({
           ) : activeTabId === 'graph' ? (
             <GraphView files={files} links={links} onSelectFile={openFileTab} />
           ) : activeTabId === 'team' ? (
-            <TeamTracker executionSteps={executionSteps} handoffs={handoffs} />
+            <TeamTracker
+              brainId={brainId}
+              executionSteps={executionSteps}
+              handoffs={handoffs}
+              refreshSnapshot={refreshSnapshot}
+            />
           ) : loadingFile === activeTabId ? (
             <BrainLoader />
           ) : activeFileContent ? (

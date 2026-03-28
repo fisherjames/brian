@@ -132,6 +132,8 @@ export function scanBrainFiles(brainPath: string): BrainFile[] {
       if (entry.name.startsWith('.')) continue
       // Skip node_modules
       if (entry.name === 'node_modules') continue
+      // Skip legacy/demo content at repo root to avoid graph bleed
+      if (!prefix && (entry.name === 'demo' || entry.name === 'examples')) continue
 
       const fullPath = path.join(dir, entry.name)
       const relativePath = prefix ? `${prefix}/${entry.name}` : entry.name
@@ -303,38 +305,4 @@ export function readBrainFile(brainPath: string, filePath: string): string {
   }
 
   return fs.readFileSync(resolved, 'utf8')
-}
-
-// ── Demo brain path ──────────────────────────────────
-
-export function getDemoBrainPath(): string {
-  // The demo brain is bundled at the package root/demo/
-  // When running from the monorepo, it's at ../../demo relative to packages/web
-  const candidates = [
-    path.join(process.cwd(), 'demo'),
-    path.join(process.cwd(), '..', '..', 'demo'),
-    path.join(__dirname, '..', '..', '..', '..', 'demo'),
-  ]
-
-  for (const candidate of candidates) {
-    if (fs.existsSync(path.join(candidate, '.brian', 'brain.json')) && fs.existsSync(path.join(candidate, 'brian', 'index.md'))) {
-      return candidate
-    }
-  }
-
-  return candidates[0]
-}
-
-export function isDemoEnabled(): boolean {
-  const raw = (process.env.BRIAN_SHOW_DEMO ?? process.env.NEXT_PUBLIC_BRIAN_SHOW_DEMO ?? '').toLowerCase()
-  return raw === '1' || raw === 'true' || raw === 'yes'
-}
-
-export const DEMO_BRAIN: LocalBrain = {
-  id: 'demo',
-  name: 'clsh.dev Brain',
-  description:
-    'Phone-first terminal. Your Mac, in your pocket. Built from zero to full open source using Brian.',
-  path: '', // Set at runtime via getDemoBrainPath()
-  createdAt: '2026-03-19T00:00:00Z',
 }

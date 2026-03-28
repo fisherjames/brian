@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getBrain, getDemoBrainPath, isDemoEnabled, readBrainFile } from '@/lib/local-data'
+import { getBrain, readBrainFile } from '@/lib/local-data'
 
 export async function GET(
   request: NextRequest,
@@ -12,19 +12,11 @@ export async function GET(
     return new NextResponse('Missing path parameter', { status: 400 })
   }
 
-  let brainPath: string
-  if (brainId === 'demo') {
-    if (!isDemoEnabled()) {
-      return new NextResponse('Brain not found', { status: 404 })
-    }
-    brainPath = getDemoBrainPath()
-  } else {
-    const brain = getBrain(brainId)
-    if (!brain) {
-      return new NextResponse('Brain not found', { status: 404 })
-    }
-    brainPath = brain.path
+  const brain = getBrain(brainId)
+  if (!brain) {
+    return new NextResponse('Brain not found', { status: 404 })
   }
+  const brainPath = brain.path
 
   try {
     const content = readBrainFile(brainPath, filePath)

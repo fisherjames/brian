@@ -785,9 +785,10 @@ function appendMissionTeamBoard(brainRoot: string, featureName: string, stepId: 
     '',
     `### Step ${stepNumber}: Deliver ${featureName}`,
     '- **Status**: not_started',
-    `- [ ] NEXT: Create the implementation plan from ${stepId}.`,
-    '- [ ] NEXT: Assign owners and owned paths.',
-    '- [ ] MERGE: Define explicit PR merge order.',
+    `- [ ] NEXT: feature="Implement ${featureName} from ${stepId}" worktree=feature/${slugify(featureName)} image=pending breaking=none`,
+    `- [ ] NEXT: feature="Assign owners + owned paths for ${featureName}" worktree=feature/${slugify(featureName)}-ownership image=pending breaking=none`,
+    `- [ ] VERIFY: Human verified "${featureName}" behavior before merge.`,
+    `- [ ] MERGE: worktree=feature/${slugify(featureName)} -> main feature="${featureName}" image=pending breaking=none`,
     '- [ ] BLOCKER: Capture blockers and unblock condition.',
     '',
   ].join('\n')
@@ -819,20 +820,20 @@ function commandPromptSummary(brainRoot: string) {
   console.log('  - /status    Show Codex session configuration and token usage')
   console.log('')
   console.log('  Brian workflow commands live in the shell:')
+  console.log('  - brian next')
+  console.log('  - brian work [--role <role>]')
+  console.log('  - brian end [--role <role>]')
+  console.log('  - brian status')
+  console.log('  - brian mission <feature>')
   console.log('  - brian init')
   console.log('  - brian resume')
   console.log('  - brian wrap-up')
-  console.log('  - brian status')
   console.log('  - brian notes <scope>')
-  console.log('  - brian next')
   console.log('  - brian plan <step>')
   console.log('  - brian sprint')
   console.log('  - brian sync')
   console.log('  - brian spec <feature>')
-  console.log('  - brian mission <feature>')
   console.log('  - brian feature <name> (alias for brian spec)')
-  console.log('  - brian work [--role <role>]')
-  console.log('  - brian end [--role <role>]')
   console.log('')
 }
 
@@ -1026,6 +1027,8 @@ function injectPackageScripts(brainRoot: string, preset: InitPreset) {
     'brain:viewer': 'brian',
     'brain:resume': 'brian resume',
     'brain:status': 'brian status',
+    'brain:work': 'brian work',
+    'brain:end': 'brian end',
     'brain:sync': 'brian sync',
     'brain:wrap': 'brian wrap-up',
     'brain:notes': 'brian notes',
@@ -1034,11 +1037,6 @@ function injectPackageScripts(brainRoot: string, preset: InitPreset) {
     'brain:spec': 'brian spec',
     'brain:mission': 'brian mission',
     'brain:feature': 'brian spec',
-  }
-
-  if (preset === 'codex-team') {
-    additions['brain:start'] = 'brian work'
-    additions['brain:end'] = 'brian end'
   }
 
   let changed = false
@@ -1163,6 +1161,9 @@ ${hasCommands ? '- Open [[commands]] and the relevant role note in [[agents]] wh
 - Update the matching brain note when architecture, priorities, or risks change.
 - Use \`brian notes "<scope>"\` after changing a top-level or workflow note so downstream notes do not drift.
 - End meaningful sessions with a new handoff note and execution plan updates.
+- Prefer feature-length commits over tiny fragmented commits.
+- Include explicit breaking-change callouts in commit messages when behavior or interfaces change.
+- For UI-visible changes, attach a before/after image reference in commit or PR notes when possible.
 
 ## Verification
 - Run the narrowest realistic check for the files you changed.
@@ -1207,10 +1208,11 @@ ${hasCommands ? '- Open [[commands]] and the relevant role note in [[agents]] wh
 > Part of [[index]]
 
 ## Principles
-- Start non-trivial work with a spec packet.
+- Intent before implementation for non-trivial work.
+- Multi-step refinement over one-shot generation (\`spec -> plan -> tasks -> review\`).
 - Keep [[execution-plan]], [[team-board]], and [[handoffs]] in sync.
-- Prefer narrow, verifiable changes over large rewrites.
-- When parallelizing, state ownership, blockers, and merge order explicitly.
+- Prefer feature-length but reversible slices with explicit verification.
+- Call out breaking changes explicitly and attach UI evidence when feasible.
 `)
 
   writeFileIfMissing(path.join(docsRoot, 'specs', 'specs.md'), `# specs
@@ -1310,7 +1312,7 @@ Imported markdown docs from the repository should be linked here when you run in
 
 - Replace this with the real setup, run, test, and deploy commands for the project.
 - Capture any environment prerequisites or local services.
-${options.addPackageScripts ? '\n## Helper Commands\n- `npm run brain:viewer`\n- `npm run brain:resume`\n- `npm run brain:status`\n- `npm run brain:next`\n- `npm run brain:sync`\n- `npm run brain:mission -- "Feature Name"`\n- `npm run brain:spec -- "Feature Name"`\n- `npm run brain:wrap`\n- `npm run brain:notes -- "<scope>"`\n' : ''}
+${options.addPackageScripts ? '\n## Helper Commands\n- `npm run brain:viewer`\n- `npm run brain:next`\n- `npm run brain:work`\n- `npm run brain:end`\n- `npm run brain:status`\n- `npm run brain:mission -- "Feature Name"`\n- `npm run brain:spec -- "Feature Name"`\n- `npm run brain:sync`\n- `npm run brain:wrap`\n- `npm run brain:notes -- "<scope>"`\n' : ''}
 ${options.installSkills ? '\n## Managed Skills\n- Brian installs a shared Codex skill pack under `~/.codex/skills/` for core work, roles, and team orchestration.\n' : ''}
 `)
 
@@ -1325,7 +1327,9 @@ ${hasCommands
 4. Use \`brian mission "<feature>"\` for non-trivial feature work.
 5. Open the relevant area note before editing code or docs.
 6. Use \`brian notes "<scope>"\` after changing a top-level or workflow note.
-7. Create a new handoff before ending a meaningful session.`
+7. Keep queue items feature-length and worktree-mapped (\`feature/worktree/image/breaking\`).
+8. Record human verification in [[team-board]] before completing MERGE tasks.
+9. Create a new handoff before ending a meaningful session.`
   : `1. Read [[index]], \`AGENTS.md\`, [[execution-plan]], and the latest handoff.
 2. Inspect the relevant area before editing code.
 3. Make a narrow, testable change.
@@ -1355,7 +1359,7 @@ This folder defines the managed Codex workflow layer for the repository.
 ## Canonical Start
 \`\`\`bash
 brian work
-${options.addPackageScripts ? 'npm run brain:start' : 'brian work --role frontend'}
+${options.addPackageScripts ? 'npm run brain:work' : 'brian work --role frontend'}
 \`\`\`
 
 ## Sequence
@@ -1423,9 +1427,10 @@ This note is the viewer-facing coordination surface for managed multi-role work.
 
 ### Step 99.1: Team workflow ready
 - **Status**: in_progress
-- [ ] NEXT: Capture active role owners and owned paths for the current sprint.
-- [ ] NEXT: Record review dependencies before opening parallel PRs.
-- [ ] MERGE: List merge order explicitly to avoid integration deadlocks.
+- [ ] NEXT: feature="Capture active role owners and owned paths for the current sprint" worktree=feature/owners-paths image=pending breaking=none
+- [ ] NEXT: feature="Record review dependencies before opening parallel PRs" worktree=feature/review-dependencies image=pending breaking=none
+- [ ] VERIFY: Human verifies feature behavior + acceptance criteria before merge.
+- [ ] MERGE: worktree=feature/owners-paths -> main feature="Owners and owned paths baseline" image=pending breaking=none
 - [ ] BLOCKER: Add unresolved blockers with owner + unblock condition.
 
 ### Step 99.2: Session updates
@@ -1529,6 +1534,11 @@ Store screenshots, diagrams, PDFs, and other external reference material here.
 ## Files Updated
 
 ## Verification
+
+## Commit Notes
+- Breaking changes:
+- Commit scope:
+- UI before/after evidence:
 
 ## Open Risks
 
@@ -1713,6 +1723,11 @@ ${humanNow()}
 
 ## Verification
 
+## Commit Notes
+- Breaking changes:
+- Commit scope:
+- UI before/after evidence:
+
 ## Open Risks
 
 ## Recommended Next Step
@@ -1803,20 +1818,20 @@ function showHelp() {
 
   Usage:
     brian                           Start the viewer
-    brian init                      Create a Brian scaffold in the current project
-    brian resume                    Show the files to read before working
+    brian next                      Show one recommended next command
     brian work                      Launch Codex with the managed Brian start prompt
-    brian wrap-up                   Create the next handoff template
     brian end                       Create a handoff and launch the managed wrap-up prompt
     brian status                    Show the current brain or all registered brains
+    brian mission <name>            Create spec packet + append execution/team work items
+    brian init                      Create a Brian scaffold in the current project
+    brian resume                    Show the files to read before working
+    brian wrap-up                   Create the next handoff template
     brian notes <scope>             Reconcile downstream notes after top-level edits
-    brian next                      Show one recommended next command
     brian migrate                   Move a legacy layout into brian/.brian
     brian plan [step]               Create a step plan note for an execution-plan step
     brian sprint                    Create a sprint note from ready and in-progress work
     brian sync                      Scan the brain for broken links and disconnected files
     brian spec <name>               Create a spec packet under brian/specs/
-    brian mission <name>            Create spec packet + append execution/team work items
     brian feature <name>            Alias for brian spec <name>
     brian codex                     Show the Codex slash-command mapping for Brian
     brian help                      Show this help

@@ -10,29 +10,41 @@ export async function PATCH(
 ) {
   const { brainId } = await params
   const body = await request.json()
-  const { stepId, status } = body as { stepId: string; status: string }
-
-  if (!stepId || !status) {
-    return NextResponse.json({ error: 'Missing stepId or status' }, { status: 400 })
+  const { stepId, status, taskIndex, taskDone, appendTaskText } = body as {
+    stepId: string
+    status?: string
+    taskIndex?: number
+    taskDone?: boolean
+    appendTaskText?: string
   }
 
-  let brainPath: string
-  if (brainId === 'demo') {
-    // Demo brain is read-only
-    return NextResponse.json({ error: 'Demo brain is read-only' }, { status: 403 })
-  } else {
-    const brain = getBrain(brainId)
-    if (!brain) {
-      return NextResponse.json({ error: 'Brain not found' }, { status: 404 })
-    }
-    brainPath = brain.path
+  if (!stepId) {
+    return NextResponse.json({ error: 'Missing stepId' }, { status: 400 })
   }
 
-  // Find the execution plan file
+  const wantsStatusUpdate = typeof status === 'string' && status.trim().length > 0
+  const wantsTaskToggle = Number.isInteger(taskIndex) && typeof taskDone === 'boolean'
+  const wantsTaskAppend = typeof appendTaskText === 'string' && appendTaskText.trim().length > 0
+
+  if (!wantsStatusUpdate && !wantsTaskToggle && !wantsTaskAppend) {
+    return NextResponse.json({ error: 'No valid update payload provided' }, { status: 400 })
+  }
+
+  const brain = getBrain(brainId)
+  if (!brain) {
+    return NextResponse.json({ error: 'Brain not found' }, { status: 404 })
+  }
+  const brainPath = brain.path
+
+  const isTeamStep = stepId.startsWith('team-step-')
+
+  // Find the target plan file
   const files = scanBrainFiles(brainPath)
-  const execFile = files.find((f) => isExecutionPlanFile(f.path))
+  const execFile = isTeamStep
+    ? files.find((f) => f.path === 'brian/commands/team-board.md')
+    : files.find((f) => isExecutionPlanFile(f.path))
   if (!execFile) {
-    return NextResponse.json({ error: 'No execution plan found' }, { status: 404 })
+    return NextResponse.json({ error: isTeamStep ? 'No team board found' : 'No execution plan found' }, { status: 404 })
   }
 
   const fullPath = path.join(brainPath, execFile.path)
@@ -46,8 +58,6 @@ export async function PATCH(
       return NextResponse.json({ error: 'Invalid stepId' }, { status: 400 })
     }
 
-    // Update the status in the markdown
-    // This is a best-effort approach: find status markers and update them
     const statusMap: Record<string, string> = {
       completed: 'COMPLETED',
       in_progress: 'IN PROGRESS',
@@ -55,37 +65,76 @@ export async function PATCH(
       blocked: 'BLOCKED',
     }
 
-    const newStatusText = statusMap[status] ?? status.toUpperCase()
+    const newStatusText = wantsStatusUpdate ? (statusMap[status ?? ''] ?? (status ?? '').toUpperCase()) : null
 
-    // For table format, update the status column
     const lines = content.split('\n')
     let stepCount = -1
+    let updated = false
+
+    function findTaskLineIndices(startLine: number): number[] {
+      const indices: number[] = []
+      for (let i = startLine + 1; i < lines.length; i++) {
+        const line = lines[i]
+        if (/^###\s+/.test(line)) break
+        if (/^\s*-\s+\[( |x)\]\s+/i.test(line)) {
+          indices.push(i)
+        }
+      }
+      return indices
+    }
+
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i]
-      // Check for table rows with step numbers
-      if (line.trim().startsWith('|') && !line.trim().match(/^\|[\s\-|]+\|$/) && !/step/i.test(line)) {
+      if (!isTeamStep && wantsStatusUpdate && line.trim().startsWith('|') && !line.trim().match(/^\|[\s\-|]+\|$/) && !/step/i.test(line)) {
         const cells = line.split('|').map((c) => c.trim()).filter(Boolean)
         if (cells.length >= 2 && /^\d/.test(cells[0])) {
           stepCount++
           if (stepCount === stepIndex) {
-            // Replace the status cell (typically the last cell)
             const statusCellIdx = cells.length - 1
-            cells[statusCellIdx] = newStatusText.toLowerCase().replace(/\s+/g, '_')
+            cells[statusCellIdx] = (newStatusText as string).toLowerCase().replace(/\s+/g, '_')
             lines[i] = '| ' + cells.join(' | ') + ' |'
+            updated = true
             break
           }
         }
       }
 
-      // Also handle header format: "- **Status**: ..."
       const statusMatch = line.match(/^(\s*-\s+\*\*Status\*\*:\s*)(.+)/i)
       if (statusMatch) {
         stepCount++
         if (stepCount === stepIndex) {
-          lines[i] = statusMatch[1] + newStatusText
+          if (wantsStatusUpdate && newStatusText) {
+            lines[i] = statusMatch[1] + newStatusText
+            updated = true
+          }
+
+          if (wantsTaskToggle) {
+            const taskLines = findTaskLineIndices(i)
+            const taskLineIdx = taskLines[taskIndex as number]
+            if (taskLineIdx !== undefined) {
+              lines[taskLineIdx] = lines[taskLineIdx].replace(
+                /^(\s*-\s+\[)( |x)(\]\s+)/i,
+                `$1${taskDone ? 'x' : ' '}$3`
+              )
+              updated = true
+            }
+          }
+
+          if (wantsTaskAppend) {
+            const nextSectionIdx = lines.slice(i + 1).findIndex((l) => /^###\s+/.test(l))
+            const insertAt = nextSectionIdx === -1 ? lines.length : i + 1 + nextSectionIdx
+            const taskText = appendTaskText?.trim()
+            lines.splice(insertAt, 0, `- [ ] ${taskText}`)
+            updated = true
+          }
+
           break
         }
       }
+    }
+
+    if (!updated) {
+      return NextResponse.json({ error: 'Target step/task not found' }, { status: 404 })
     }
 
     content = lines.join('\n')

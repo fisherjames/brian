@@ -99,20 +99,20 @@ The installed skill pack includes:
 ## Commands
 
 - `brian` starts the viewer
-- `brian init` scaffolds a Brian workspace
-- `brian migrate` converts an old layout into `brian/` + `.brian/`
-- `brian resume` prints the canonical files to read
+- `brian next` shows one recommended next command
 - `brian work [--role <role>]` launches Codex with the managed start prompt
-- `brian wrap-up` creates the next handoff template
 - `brian end [--role <role>]` creates the handoff and launches the managed wrap-up prompt
 - `brian status` shows the active brain or all registered brains
+- `brian mission "<name>"` creates spec packet + execution/team entries
+- `brian init` scaffolds a Brian workspace
+- `brian resume` prints the canonical files to read
+- `brian wrap-up` creates the next handoff template
 - `brian notes "<scope>"` reconciles downstream notes after top-level edits
-- `brian next` prints one recommended next command
+- `brian migrate` converts an old layout into `brian/` + `.brian/`
 - `brian plan [step]` creates a linked planning note
 - `brian sprint` creates a sprint note from ready/in-progress work
 - `brian sync` audits links and parent relationships
 - `brian spec "<name>"` creates a feature spec packet
-- `brian mission "<name>"` creates spec packet + execution/team entries
 - `brian feature "<name>"` aliases to `brian spec`
 - `brian codex` prints the Codex/Brian split
 

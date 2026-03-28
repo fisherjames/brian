@@ -20,8 +20,6 @@ brian/
 ├── packages/
 │   ├── cli/        # CLI entry point (`brian`)
 │   └── web/        # Next.js app (brain viewer, local data layer)
-├── demo/           # Bundled demo brian
-├── examples/       # Full example brains
 └── docs/           # Documentation and screenshots
 ```
 

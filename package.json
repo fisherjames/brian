@@ -27,8 +27,7 @@
     "!packages/web/.next/diagnostics/",
     "packages/web/dist/",
     "packages/web/public/",
-    "packages/web/package.json",
-    "demo/"
+    "packages/web/package.json"
   ],
   "dependencies": {
     "chokidar": "^4.0.0",

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { listBrains, getDemoBrainPath, DEMO_BRAIN, isDemoEnabled, scanBrainFiles } from '@/lib/local-data'
+import { getExecutionSteps, listBrains, scanBrainFiles } from '@/lib/local-data'
 import { buildDepartmentColorMap } from '@/components/brain/department-colors'
 
 function countAgentNotes(files: Array<{ path: string }>) {
@@ -8,28 +8,17 @@ function countAgentNotes(files: Array<{ path: string }>) {
 
 export async function GET() {
   const userBrains = listBrains()
-  const demos: Array<Record<string, unknown>> = []
-  if (isDemoEnabled()) {
-    const demoBrainPath = getDemoBrainPath()
-    const demoFiles = scanBrainFiles(demoBrainPath)
-    const rootFolders = new Set(demoFiles.filter((f) => f.path.includes('/')).map((f) => f.path.split('/')[0]))
-    const colorMap = buildDepartmentColorMap(demoFiles)
-    const rootFolderColors = Array.from(rootFolders).sort().map((f) => colorMap.get(f) ?? '#64748B')
-
-    demos.push({
-      ...DEMO_BRAIN,
-      path: demoBrainPath,
-      fileCount: demoFiles.length,
-      departmentCount: rootFolders.size,
-      agentCount: countAgentNotes(demoFiles),
-      rootFolderColors,
-      is_demo: true,
-    })
-  }
 
   // Enrich user brains
   const enriched = userBrains.map((brain) => {
     const files = scanBrainFiles(brain.path)
+    const steps = getExecutionSteps(brain.path, files)
+    const totalSteps = steps.length
+    const completedSteps = steps.filter((s) => s.status === 'completed').length
+    const inProgressSteps = steps.filter((s) => s.status === 'in_progress').length
+    const blockedSteps = steps.filter((s) => s.status === 'blocked').length
+    const completion = totalSteps > 0 ? completedSteps / totalSteps : 0
+    const healthScore = Math.max(0, Math.min(100, Math.round(completion * 100 - blockedSteps * 12)))
     const folders = new Set(files.filter((f) => f.path.includes('/')).map((f) => f.path.split('/')[0]))
     const cMap = buildDepartmentColorMap(files)
     return {
@@ -38,9 +27,15 @@ export async function GET() {
       departmentCount: folders.size,
       agentCount: countAgentNotes(files),
       rootFolderColors: Array.from(folders).sort().map((f) => cMap.get(f) ?? '#64748B'),
-      is_demo: false,
+      progress: {
+        totalSteps,
+        completedSteps,
+        inProgressSteps,
+        blockedSteps,
+        healthScore,
+      },
     }
   })
 
-  return NextResponse.json({ demos, userBrains: enriched })
+  return NextResponse.json({ userBrains: enriched })
 }

@@ -31,6 +31,7 @@ interface UseBrainRealtimeReturn {
   connectionStatus: ConnectionStatus
   isStreaming: boolean
   optimisticUpdateStep: (stepId: string, status: ExecutionStep['status']) => void
+  refreshSnapshot: () => Promise<void>
 }
 
 export function useBrainRealtime(
@@ -45,6 +46,20 @@ export function useBrainRealtime(
   const [isStreaming, setIsStreaming] = useState(false)
   const wsRef = useRef<WebSocket | null>(null)
   const streamTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const refreshSnapshot = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/brains/${brainId}`)
+      if (!res.ok) return
+      const data = await res.json()
+      if (Array.isArray(data.files)) setFiles(data.files)
+      if (Array.isArray(data.links)) setLinks(data.links)
+      if (Array.isArray(data.executionSteps)) setExecutionSteps(data.executionSteps)
+      if (Array.isArray(data.handoffs)) setHandoffs(data.handoffs)
+    } catch {
+      // ignore snapshot fetch errors
+    }
+  }, [brainId])
 
   useEffect(() => {
     // Connect to WebSocket for real-time file updates
@@ -105,6 +120,14 @@ export function useBrainRealtime(
     }
   }, [brainId])
 
+  // Backup poll so external file writes (e.g. CLI handoffs) appear even if ws misses an event.
+  useEffect(() => {
+    const id = setInterval(() => {
+      void refreshSnapshot()
+    }, 10000)
+    return () => clearInterval(id)
+  }, [refreshSnapshot])
+
   // Sync initial data when props change
   useEffect(() => {
     setFiles(initialData.files)
@@ -120,5 +143,5 @@ export function useBrainRealtime(
     []
   )
 
-  return { files, links, executionSteps, handoffs, connectionStatus, isStreaming, optimisticUpdateStep }
+  return { files, links, executionSteps, handoffs, connectionStatus, isStreaming, optimisticUpdateStep, refreshSnapshot }
 }

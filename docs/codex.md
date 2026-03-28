@@ -4,20 +4,23 @@ Brian is the repo memory layer. Codex is the execution engine.
 
 ## Brian Commands
 
-- `brian init`
-- `brian migrate`
-- `brian resume`
+Canonical workflow:
+- `brian next`
 - `brian work`
-- `brian wrap-up`
 - `brian end`
 - `brian status`
+- `brian mission`
+
+Compatibility and maintenance:
+- `brian init`
+- `brian resume`
+- `brian wrap-up`
 - `brian notes`
-- `brian next`
+- `brian migrate`
 - `brian plan`
 - `brian sprint`
 - `brian sync`
 - `brian spec`
-- `brian mission`
 - `brian feature` (alias)
 
 ## Codex Slash Commands
@@ -47,6 +50,19 @@ brian end --role backend
 ```
 
 The managed skill pack supplies the reusable behavior. Brian notes supply the project memory.
+
+Mission Control observer loop (Team Tracker):
+
+1. Open `/brains/<id>` and switch to `Team Tracker`.
+2. Click `Start Observer` to enable MCP-based queue auditing.
+3. Work through `Start Next Work`, verification, and merge queue actions.
+4. Observer auto-adds actionable `NEXT:`/`BLOCKER:` items when it detects dead-ends, conflicts, unresolved worktrees, or malformed merge metadata.
+5. Click `Stop Observer` when the mission is stable.
+
+Queue contract:
+- `NEXT:` items should be feature-length and include `feature=`, `worktree=`, `image=`, `breaking=`.
+- `MERGE:` items should use `worktree=<branch> -> main` and include `feature=`, `image=`, `breaking=`.
+- `Start Next Work` should remain blocked when hard blockers exist.
 
 ## Honest Limit
 

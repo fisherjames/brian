@@ -6,8 +6,6 @@ import {
   parseBrainLinks,
   getExecutionSteps,
   getHandoffs,
-  DEMO_BRAIN,
-  getDemoBrainPath,
 } from '../lib/local-data'
 import { isExecutionPlanFile } from '../lib/execution-plan-parser'
 
@@ -16,10 +14,7 @@ export interface WatcherHandle {
 }
 
 export function startWatcher(brainId: string, ws: WebSocket): WatcherHandle {
-  const brain =
-    brainId === 'demo'
-      ? { ...DEMO_BRAIN, path: getDemoBrainPath() }
-      : getBrain(brainId)
+  const brain = getBrain(brainId)
 
   if (!brain) {
     ws.send(JSON.stringify({ type: 'error', message: 'Brain not found' }))
@@ -55,8 +50,13 @@ export function startWatcher(brainId: string, ws: WebSocket): WatcherHandle {
         const links = parseBrainLinks(brainPath, files)
         ws.send(JSON.stringify({ type: 'links', data: links }))
 
-        // Re-parse execution plan if the changed file is an execution plan
-        if (!changedPath || isExecutionPlanFile(changedPath)) {
+        // Re-parse execution steps when execution-plan or team-board changes.
+        if (
+          !changedPath ||
+          isExecutionPlanFile(changedPath) ||
+          changedPath.includes('brian/commands/team-board.md') ||
+          changedPath.includes('brian\\commands\\team-board.md')
+        ) {
           const steps = getExecutionSteps(brainPath, files)
           ws.send(JSON.stringify({ type: 'execution_steps', data: steps }))
         }

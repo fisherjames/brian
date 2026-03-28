@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic'
 
-import { listBrains, getDemoBrainPath, DEMO_BRAIN, isDemoEnabled, scanBrainFiles } from '@/lib/local-data'
+import { getExecutionSteps, listBrains, scanBrainFiles } from '@/lib/local-data'
 import { buildDepartmentColorMap } from '@/components/brain/department-colors'
 import BrainsPageClient from './brains-page-client'
 
@@ -8,59 +8,58 @@ interface BrainCardData {
   id: string
   name: string
   description: string
-  is_demo: boolean
   fileCount: number
   departmentCount: number
   agentCount: number
   rootFolderColors: string[]
+  progress: {
+    totalSteps: number
+    completedSteps: number
+    inProgressSteps: number
+    blockedSteps: number
+    healthScore: number
+  }
 }
 
 function countAgentNotes(files: Array<{ path: string }>) {
   return files.filter((f) => f.path === 'AGENTS.md' || f.path.startsWith('Agents/') || f.path.startsWith('brian/agents/')).length
 }
 
-function getBrainData(): { demos: BrainCardData[]; userBrains: BrainCardData[] } {
-  const demos: BrainCardData[] = []
-  if (isDemoEnabled()) {
-    const demoBrainPath = getDemoBrainPath()
-    const demoFiles = scanBrainFiles(demoBrainPath)
-    const rootFolders = new Set(demoFiles.filter((f) => f.path.includes('/')).map((f) => f.path.split('/')[0]))
-    const colorMap = buildDepartmentColorMap(demoFiles)
-    const rootFolderColors = Array.from(rootFolders).sort().map((f) => colorMap.get(f) ?? '#64748B')
-
-    demos.push({
-      id: 'demo',
-      name: DEMO_BRAIN.name,
-      description: DEMO_BRAIN.description,
-      is_demo: true,
-      fileCount: demoFiles.length,
-      departmentCount: rootFolders.size,
-      agentCount: countAgentNotes(demoFiles),
-      rootFolderColors,
-    })
-  }
-
+function getBrainData(): { userBrains: BrainCardData[] } {
   const userBrains = listBrains().map((brain) => {
     const files = scanBrainFiles(brain.path)
+    const steps = getExecutionSteps(brain.path, files)
+    const totalSteps = steps.length
+    const completedSteps = steps.filter((s) => s.status === 'completed').length
+    const inProgressSteps = steps.filter((s) => s.status === 'in_progress').length
+    const blockedSteps = steps.filter((s) => s.status === 'blocked').length
+    const completion = totalSteps > 0 ? completedSteps / totalSteps : 0
+    const healthScore = Math.max(0, Math.min(100, Math.round(completion * 100 - blockedSteps * 12)))
     const folders = new Set(files.filter((f) => f.path.includes('/')).map((f) => f.path.split('/')[0]))
     const cMap = buildDepartmentColorMap(files)
     return {
       id: brain.id,
       name: brain.name,
       description: brain.description,
-      is_demo: false,
       fileCount: files.length,
       departmentCount: folders.size,
       agentCount: countAgentNotes(files),
       rootFolderColors: Array.from(folders).sort().map((f) => cMap.get(f) ?? '#64748B'),
+      progress: {
+        totalSteps,
+        completedSteps,
+        inProgressSteps,
+        blockedSteps,
+        healthScore,
+      },
     }
   })
 
-  return { demos, userBrains }
+  return { userBrains }
 }
 
 export default function BrainsPage() {
-  const { demos, userBrains } = getBrainData()
+  const { userBrains } = getBrainData()
 
   return (
     <div className="bg-mesh grain min-h-screen">
@@ -77,7 +76,7 @@ export default function BrainsPage() {
           <p className="mt-1 text-[14px] text-text-secondary">Explore project Brian workspaces or create your own.</p>
         </div>
 
-        <BrainsPageClient initialDemos={demos} initialUserBrains={userBrains} />
+        <BrainsPageClient initialUserBrains={userBrains} />
       </main>
     </div>
   )

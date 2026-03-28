@@ -6,15 +6,20 @@ interface BrainCardData {
   id: string
   name: string
   description: string
-  is_demo: boolean
   fileCount: number
   departmentCount: number
   agentCount: number
   rootFolderColors: string[]
+  progress: {
+    totalSteps: number
+    completedSteps: number
+    inProgressSteps: number
+    blockedSteps: number
+    healthScore: number
+  }
 }
 
 interface BrainsListData {
-  demos: BrainCardData[]
   userBrains: BrainCardData[]
 }
 
