@@ -88,9 +88,55 @@ function lifecycleEvent(brainId: string, method: string, params: Record<string, 
   })
 }
 
-function upsertInitiative(brainPath: string, payload: { id?: string; title: string; stage: V2Stage; summary?: string }) {
+function appendSectionLine(filePath: string, heading: string, line: string) {
+  const raw = fs.readFileSync(filePath, 'utf8')
+  const marker = `## ${heading}`
+  if (!raw.includes(marker)) {
+    const next = `${raw.trimEnd()}\n\n${marker}\n- ${line}\n`
+    fs.writeFileSync(filePath, next, 'utf8')
+    return
+  }
+  const idx = raw.indexOf(marker)
+  const tail = raw.slice(idx)
+  const nextHeadingIdx = tail.slice(marker.length).search(/\n##\s+/)
+  if (nextHeadingIdx < 0) {
+    const next = `${raw.trimEnd()}\n- ${line}\n`
+    fs.writeFileSync(filePath, next, 'utf8')
+    return
+  }
+  const insertAt = idx + marker.length + nextHeadingIdx + 1
+  const next = `${raw.slice(0, insertAt)}- ${line}\n${raw.slice(insertAt)}`
+  fs.writeFileSync(filePath, next, 'utf8')
+}
+
+function upsertInitiative(
+  brainPath: string,
+  payload: { id?: string; title: string; stage: V2Stage; summary?: string; actor?: string; note?: string }
+) {
   const id = payload.id || nextId('initiative')
   const rel = path.join('brian', 'initiatives', `${id}.md`)
+  const fullPath = path.join(brainPath, rel)
+  const existingFm = fs.existsSync(fullPath) ? parseFrontmatter(fs.readFileSync(fullPath, 'utf8')) : {}
+  const createdAt = existingFm.created_at || new Date().toISOString()
+  const actor = payload.actor || 'project-operator'
+  const note = payload.note || payload.summary || ''
+  if (fs.existsSync(fullPath)) {
+    writeRecordMarkdown(
+      brainPath,
+      rel,
+      {
+        id,
+        title: payload.title,
+        stage: payload.stage,
+        summary: payload.summary ?? '',
+        created_at: createdAt,
+        updated_at: new Date().toISOString(),
+      },
+      fs.readFileSync(fullPath, 'utf8').replace(/^---[\s\S]*?---\n?/, '').trim()
+    )
+    appendSectionLine(fullPath, 'Activity Log', `${new Date().toISOString()} · ${actor} · stage=${payload.stage} · ${note || 'updated'}`)
+    return id
+  }
   writeRecordMarkdown(
     brainPath,
     rel,
@@ -99,10 +145,26 @@ function upsertInitiative(brainPath: string, payload: { id?: string; title: stri
       title: payload.title,
       stage: payload.stage,
       summary: payload.summary ?? '',
-      created_at: new Date().toISOString(),
+      created_at: createdAt,
       updated_at: new Date().toISOString(),
     },
-    `# ${payload.title}\n\n## Stage\n${payload.stage}\n\n## Summary\n${payload.summary ?? ''}`
+    [
+      `# ${payload.title}`,
+      '',
+      `## Stage`,
+      payload.stage,
+      '',
+      `## Summary`,
+      payload.summary ?? '',
+      '',
+      `## Linked Records`,
+      `- Discussions: [[brian/discussions/index]]`,
+      `- Decisions: [[brian/decisions/index]]`,
+      `- Briefings: [[brian/briefings/index]]`,
+      '',
+      `## Activity Log`,
+      `- ${new Date().toISOString()} · ${actor} · stage=${payload.stage} · ${note || 'created'}`,
+    ].join('\n')
   )
   return id
 }
@@ -110,6 +172,8 @@ function upsertInitiative(brainPath: string, payload: { id?: string; title: stri
 function createRecord(brainPath: string, kind: 'discussions' | 'decisions' | 'briefings', title: string, data: Record<string, string>) {
   const id = nextId(kind.slice(0, -1))
   const rel = path.join('brian', kind, `${id}.md`)
+  const initiativeId = data.initiative_id || ''
+  const initiativeRef = initiativeId ? `[[brian/initiatives/${initiativeId}]]` : ''
   writeRecordMarkdown(
     brainPath,
     rel,
@@ -120,7 +184,22 @@ function createRecord(brainPath: string, kind: 'discussions' | 'decisions' | 'br
       at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     },
-    `# ${title}\n\n${Object.entries(data).map(([key, value]) => `- ${key}: ${value}`).join('\n')}`
+    [
+      `# ${title}`,
+      '',
+      `## Context`,
+      initiativeRef ? `- Initiative: ${initiativeRef}` : '- Initiative: none',
+      ...Object.entries(data).map(([key, value]) => `- ${key}: ${value}`),
+      '',
+      kind === 'discussions' ? '## Participants' : '## Owner',
+      kind === 'discussions' ? '- product-lead\n- backend-engineer\n- frontend-engineer' : `- ${data.actor || 'founder-ceo'}`,
+      '',
+      kind === 'discussions' ? '## Questions' : '## Decision Notes',
+      '- Pending author updates.',
+      '',
+      '## Outcome Log',
+      `- ${new Date().toISOString()} · record_created`,
+    ].join('\n')
   )
   return { id, rel }
 }
@@ -164,7 +243,13 @@ export function runV2McpCall(brainId: string, method: string, params: Record<str
 
   if (method === 'company.intent.capture') {
     const title = typeof params.title === 'string' ? params.title.trim() : 'Untitled intent'
-    const initiativeId = upsertInitiative(brain.path, { title, stage: 'intent', summary: String(params.summary ?? '') })
+    const initiativeId = upsertInitiative(brain.path, {
+      title,
+      stage: 'intent',
+      summary: String(params.summary ?? ''),
+      actor: typeof params.actor === 'string' ? params.actor : 'founder-ceo',
+      note: 'intent captured',
+    })
     const event = lifecycleEvent(brainId, method, { ...params, initiativeId })
     return {
       message: `intent_captured:${initiativeId}`,
@@ -180,6 +265,8 @@ export function runV2McpCall(brainId: string, method: string, params: Record<str
         title: typeof params.title === 'string' ? params.title.trim() : 'Untitled initiative',
         stage: mapStage(method),
         summary: String(params.summary ?? ''),
+        actor: typeof params.actor === 'string' ? params.actor : 'project-operator',
+        note: method,
       })
 
     const stage = mapStage(method)
@@ -188,6 +275,8 @@ export function runV2McpCall(brainId: string, method: string, params: Record<str
       title: typeof params.title === 'string' ? params.title.trim() : initiativeId,
       stage,
       summary: String(params.summary ?? ''),
+      actor: typeof params.actor === 'string' ? params.actor : 'project-operator',
+      note: method,
     })
 
     const event = lifecycleEvent(brainId, method, { ...params, initiativeId })
@@ -205,6 +294,7 @@ export function runV2McpCall(brainId: string, method: string, params: Record<str
       status: 'open',
       initiative_id: typeof params.initiativeId === 'string' ? params.initiativeId : '',
       unresolved_questions: '1',
+      actor: typeof params.actor === 'string' ? params.actor : 'product-lead',
     })
     const event = lifecycleEvent(brainId, method, { ...params, discussionId: discussion.id })
     return { message: `discussion_opened:${discussion.id}`, event, ...readV2ApiData(brainId) }
@@ -224,17 +314,32 @@ export function runV2McpCall(brainId: string, method: string, params: Record<str
         status: unresolved === 0 ? 'resolved' : 'open',
         updated_at: new Date().toISOString(),
       })
+      appendSectionLine(
+        discussionPath,
+        'Outcome Log',
+        `${new Date().toISOString()} · ${typeof params.actor === 'string' ? params.actor : 'specialist'} answered: ${String(params.message ?? 'response posted')}`
+      )
     } else if (method === 'discussion.escalate') {
       updateFrontmatter(discussionPath, {
         status: 'escalated',
         updated_at: new Date().toISOString(),
       })
+      appendSectionLine(
+        discussionPath,
+        'Outcome Log',
+        `${new Date().toISOString()} · ${typeof params.actor === 'string' ? params.actor : 'product-lead'} escalated: ${String(params.message ?? 'needs higher-level decision')}`
+      )
     } else {
       updateFrontmatter(discussionPath, {
         status: 'resolved',
         unresolved_questions: '0',
         updated_at: new Date().toISOString(),
       })
+      appendSectionLine(
+        discussionPath,
+        'Outcome Log',
+        `${new Date().toISOString()} · ${typeof params.actor === 'string' ? params.actor : 'project-operator'} resolved`
+      )
     }
 
     const event = lifecycleEvent(brainId, method, { ...params, discussionId })
@@ -247,6 +352,7 @@ export function runV2McpCall(brainId: string, method: string, params: Record<str
       initiative_id: typeof params.initiativeId === 'string' ? params.initiativeId : '',
       status: typeof params.status === 'string' ? params.status : 'pending',
       rationale: typeof params.rationale === 'string' ? params.rationale : '',
+      actor: typeof params.actor === 'string' ? params.actor : 'founder-ceo',
     })
     const event = lifecycleEvent(brainId, method, { ...params, decisionId: decision.id })
     return { message: `decision_recorded:${decision.id}`, event, ...readV2ApiData(brainId) }
@@ -273,6 +379,11 @@ export function runV2McpCall(brainId: string, method: string, params: Record<str
       status,
       updated_at: new Date().toISOString(),
     })
+    appendSectionLine(
+      decisionPath,
+      'Outcome Log',
+      `${new Date().toISOString()} · ${typeof params.actor === 'string' ? params.actor : 'founder-ceo'} marked ${status}`
+    )
     const event = lifecycleEvent(brainId, 'decision.record', {
       ...params,
       decisionId,
