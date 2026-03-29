@@ -7,6 +7,8 @@ interface BrainCardData {
   id: string
   name: string
   description: string
+  mode?: string
+  path?: string
   fileCount: number
   departmentCount: number
   agentCount: number
@@ -36,6 +38,11 @@ function BrainCard({ brain }: { brain: BrainCardData }) {
             <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
           </svg>
         </div>
+        {(brain.name.toLowerCase().includes('dogfood') || brain.path?.startsWith('/private/tmp/')) && (
+          <span className="rounded-full border border-border/70 bg-bg px-2 py-0.5 text-[10px] uppercase tracking-wide text-text-muted">
+            Sandbox
+          </span>
+        )}
       </div>
       <h3 className="mb-1 text-[15px] font-semibold tracking-tight transition-colors duration-200 group-hover:text-leaf">{brain.name}</h3>
       {brain.description && (
@@ -60,6 +67,7 @@ function BrainCard({ brain }: { brain: BrainCardData }) {
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-text-muted">
+        {brain.mode && <span className="rounded bg-bg-card px-1.5 py-0.5 text-[10px] uppercase tracking-wide">{brain.mode}</span>}
         <span className="flex items-center gap-1">
           <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />

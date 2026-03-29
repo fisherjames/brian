@@ -75,24 +75,8 @@ export function BrainLayout({
     if (mobile) setSidebarOpen(false);
   }, []);
 
-  const [v2Enabled, setV2Enabled] = useState(false);
-  useEffect(() => {
-    const envEnabled = process.env.NEXT_PUBLIC_BRIAN_V2 === '1';
-    const queryEnabled = new URLSearchParams(window.location.search).get('v2') === '1';
-    setV2Enabled(envEnabled || queryEnabled);
-  }, []);
-
-  const [activeTabId, setActiveTabId] = useState('graph');
-  const [tabs, setTabs] = useState<Tab[]>([GRAPH_TAB, TEAM_TAB]);
-  useEffect(() => {
-    setTabs((prev) => {
-      const hasDirector = prev.some((tab) => tab.id === 'director');
-      if (v2Enabled && !hasDirector) return [prev[0] ?? GRAPH_TAB, prev[1] ?? TEAM_TAB, DIRECTOR_TAB, ...prev.slice(2)];
-      if (!v2Enabled && hasDirector) return prev.filter((tab) => tab.id !== 'director');
-      return prev;
-    });
-    if (!v2Enabled && activeTabId === 'director') setActiveTabId('team');
-  }, [v2Enabled, activeTabId]);
+  const [activeTabId, setActiveTabId] = useState('director');
+  const [tabs, setTabs] = useState<Tab[]>([GRAPH_TAB, TEAM_TAB, DIRECTOR_TAB]);
   const [fileContents, setFileContents] = useState<Map<string, string>>(new Map());
   const [loadingFile, setLoadingFile] = useState<string | null>(null);
 

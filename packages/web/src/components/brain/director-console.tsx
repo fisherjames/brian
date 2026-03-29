@@ -226,6 +226,11 @@ export default function DirectorConsole({ brainId }: { brainId: string }) {
         </div>
       </div>
 
+      <div className="mb-4 rounded border border-border bg-white p-3">
+        <div className="mb-1 text-[11px] uppercase tracking-wide text-text-muted">How To Use CEO Dashboard</div>
+        <div className="text-[12px] text-text-secondary">1) Capture or seed initiatives. 2) Approve decisions and resolve escalations. 3) Generate briefing and use Team Tracker for verification + merge.</div>
+      </div>
+
       <div className="mb-4 flex items-center justify-between rounded border border-border bg-white p-3">
         <div>
           <div className="text-[11px] uppercase tracking-wide text-text-muted">Mission Status</div>
