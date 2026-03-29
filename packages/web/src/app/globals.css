@@ -6,13 +6,8 @@
 @font-face { font-family: "Inter"; font-style: normal; font-weight: 600; font-display: swap; src: url("/fonts/Inter-SemiBold.woff2") format("woff2"); }
 @font-face { font-family: "Inter"; font-style: normal; font-weight: 700; font-display: swap; src: url("/fonts/Inter-Bold.woff2") format("woff2"); }
 @font-face { font-family: "Lora"; font-style: normal; font-weight: 400; font-display: swap; src: url("/fonts/Lora-Regular.woff2") format("woff2"); }
-@font-face { font-family: "Lora"; font-style: normal; font-weight: 500; font-display: swap; src: url("/fonts/Lora-Medium.woff2") format("woff2"); }
-@font-face { font-family: "Lora"; font-style: normal; font-weight: 600; font-display: swap; src: url("/fonts/Lora-SemiBold.woff2") format("woff2"); }
-@font-face { font-family: "Lora"; font-style: normal; font-weight: 700; font-display: swap; src: url("/fonts/Lora-Bold.woff2") format("woff2"); }
 @font-face { font-family: "Lora"; font-style: italic; font-weight: 400; font-display: swap; src: url("/fonts/Lora-Italic.woff2") format("woff2"); }
 @font-face { font-family: "Lora"; font-style: italic; font-weight: 500; font-display: swap; src: url("/fonts/Lora-MediumItalic.woff2") format("woff2"); }
-@font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 400; font-display: swap; src: url("/fonts/JetBrainsMono-Regular.woff2") format("woff2"); }
-@font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 500; font-display: swap; src: url("/fonts/JetBrainsMono-Medium.woff2") format("woff2"); }
 
 @layer base {
   a, button, [role="button"], input[type="submit"], input[type="reset"], input[type="button"], select, summary {
@@ -44,7 +39,7 @@
 
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-serif: "Lora", ui-serif, Georgia, serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 body {

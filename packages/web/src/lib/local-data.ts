@@ -48,6 +48,7 @@ export interface Handoff {
 
 const CONFIG_DIR = path.join(os.homedir(), '.brian')
 const CONFIG_FILE = path.join(CONFIG_DIR, 'brains.json')
+const CODEX_SKILLS_DIR = path.join(os.homedir(), '.codex', 'skills')
 
 interface BrainsConfig {
   brains: LocalBrain[]
@@ -305,4 +306,45 @@ export function readBrainFile(brainPath: string, filePath: string): string {
   }
 
   return fs.readFileSync(resolved, 'utf8')
+}
+
+export function writeBrainFile(brainPath: string, filePath: string, content: string): void {
+  const root = path.resolve(brainPath)
+  const resolved = path.resolve(brainPath, filePath)
+  if (!resolved.startsWith(root)) {
+    throw new Error('Path traversal detected')
+  }
+  fs.mkdirSync(path.dirname(resolved), { recursive: true })
+  fs.writeFileSync(resolved, content, 'utf8')
+}
+
+function resolveCodexSkillPath(skillName: string): string {
+  const trimmed = skillName.trim()
+  if (!trimmed || trimmed.includes('..') || trimmed.includes('/') || trimmed.includes('\\')) {
+    throw new Error('Invalid skill name')
+  }
+  const resolved = path.resolve(CODEX_SKILLS_DIR, trimmed, 'SKILL.md')
+  const root = path.resolve(CODEX_SKILLS_DIR)
+  if (!resolved.startsWith(root)) throw new Error('Path traversal detected')
+  return resolved
+}
+
+export function listCodexSkills(): string[] {
+  if (!fs.existsSync(CODEX_SKILLS_DIR)) return []
+  const entries = fs.readdirSync(CODEX_SKILLS_DIR, { withFileTypes: true })
+  return entries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .filter((name) => fs.existsSync(path.join(CODEX_SKILLS_DIR, name, 'SKILL.md')))
+    .sort((a, b) => a.localeCompare(b))
+}
+
+export function readCodexSkill(skillName: string): string {
+  const filePath = resolveCodexSkillPath(skillName)
+  return fs.readFileSync(filePath, 'utf8')
+}
+
+export function writeCodexSkill(skillName: string, content: string): void {
+  const filePath = resolveCodexSkillPath(skillName)
+  fs.writeFileSync(filePath, content, 'utf8')
 }

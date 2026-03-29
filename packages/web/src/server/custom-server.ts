@@ -13,8 +13,26 @@ import { isV2Method, runV2McpCall } from './v2/mcp'
 const dev = process.env.NODE_ENV !== 'production'
 const port = parseInt(process.env.PORT || '3000', 10)
 
-// __dirname is packages/web/src/server, project root is two levels up
-const projectRoot = path.resolve(__dirname, '..', '..')
+function isWebProjectRoot(candidate: string): boolean {
+  return fs.existsSync(path.join(candidate, 'package.json')) && fs.existsSync(path.join(candidate, 'src', 'app'))
+}
+
+function resolveWebProjectRoot(): string {
+  const fromEnv = process.env.BRIAN_WEB_ROOT?.trim()
+  if (fromEnv && isWebProjectRoot(fromEnv)) return path.resolve(fromEnv)
+
+  const fromCwd = path.resolve(process.cwd())
+  if (isWebProjectRoot(fromCwd)) return fromCwd
+
+  // Works for tsx dev runs from src/server and tsc output runs from dist/server.
+  const fromDirTwoUp = path.resolve(__dirname, '..', '..')
+  if (isWebProjectRoot(fromDirTwoUp)) return fromDirTwoUp
+
+  // Last-resort fallback so startup emits deterministic preflight errors.
+  return fromCwd
+}
+
+const projectRoot = resolveWebProjectRoot()
 const app = next({
   dev,
   dir: projectRoot,
@@ -62,17 +80,22 @@ type TeamObserver = {
   timer: NodeJS.Timeout
 }
 
-type V2Autopilot = {
-  brainId: string
-  startedAt: string
-  ticks: number
-  timer: NodeJS.Timeout
-}
-
 const activeRuns = new Map<string, BrainRun>()
 const activeChildren = new Map<string, ChildProcess>()
 const teamObservers = new Map<string, TeamObserver>()
-const v2Autopilots = new Map<string, V2Autopilot>()
+
+function verifyNextBuildArtifacts(root: string): { ok: true } | { ok: false; missing: string[] } {
+  const required = [
+    '.next/BUILD_ID',
+    '.next/build-manifest.json',
+    '.next/required-server-files.json',
+    '.next/server/middleware-manifest.json',
+    '.next/server/webpack-runtime.js',
+  ]
+  const missing = required.filter((rel) => !fs.existsSync(path.join(root, rel)))
+  if (missing.length > 0) return { ok: false, missing }
+  return { ok: true }
+}
 
 function broadcastSnapshotToBrainSubscribers(brainId: string, snapshot: TeamSnapshot) {
   for (const [client, watcher] of clientWatchers.entries()) {
@@ -102,9 +125,15 @@ function createAutoHandoff(brainId: string, run: BrainRun): string | null {
     return Math.max(acc, Number(match[1]))
   }, 0)
   const session = maxSession + 1
-  const sessionId = String(session).padStart(3, '0')
-  const fileName = `handoff-${sessionId}.md`
-  const filePath = path.join(handoffDir, fileName)
+  let sessionId = String(session).padStart(3, '0')
+  let fileName = `handoff-${sessionId}.md`
+  let filePath = path.join(handoffDir, fileName)
+  while (fs.existsSync(filePath)) {
+    const next = Number(sessionId) + 1
+    sessionId = String(next).padStart(3, '0')
+    fileName = `handoff-${sessionId}.md`
+    filePath = path.join(handoffDir, fileName)
+  }
 
   const started = new Date(run.startedAt)
   const ended = new Date(run.endedAt ?? new Date().toISOString())
@@ -119,7 +148,7 @@ function createAutoHandoff(brainId: string, run: BrainRun): string | null {
   const content = [
     `# handoff-${sessionId}`,
     '',
-    '> Part of [[handoffs]]',
+    '> Part of [[handoffs/index]]',
     '',
     '## Session Snapshot',
     `- Started: ${run.startedAt}`,
@@ -155,9 +184,9 @@ function inferActor(label: string): string {
 function classifyStage(line: string): 'planning' | 'coding' | 'verification' | 'blocker' | 'system' {
   const lower = line.toLowerCase()
   if (lower.includes('error') || lower.includes('failed') || lower.includes('conflict')) return 'blocker'
+  if (lower.includes('implement') || lower.includes('edit') || lower.includes('patch') || lower.includes('diff')) return 'coding'
   if (lower.includes('test') || lower.includes('verify') || lower.includes('validation')) return 'verification'
   if (lower.includes('plan') || lower.includes('todo')) return 'planning'
-  if (lower.includes('edit') || lower.includes('patch') || lower.includes('implement') || lower.includes('diff')) return 'coding'
   return 'system'
 }
 
@@ -177,7 +206,19 @@ function shouldIgnoreLogLine(line: string): boolean {
     'session id:',
     'user',
   ]
-  return noise.some((n) => trimmed.startsWith(n))
+  if (noise.some((n) => trimmed.startsWith(n))) return true
+
+  // Ignore command and shell noise that drowns out mission-control signal.
+  if (/^\/bin\/(zsh|bash)\s+-lc\s+/i.test(trimmed)) return true
+  if (/^(succeeded|failed) in \d+ms:/i.test(trimmed)) return true
+  if (/^total\s+\d+$/i.test(trimmed)) return true
+  if (/^[\-dl]([rwx\-]{9}|[rwx\-]{9}@)\s+\d+\s+\w+/i.test(trimmed)) return true
+  if (/^drwx|^-rw|^-rwx/i.test(trimmed)) return true
+  if (/^[0-9a-f]{8}-[0-9a-f-]{20,}$/i.test(trimmed)) return true
+  if (/^exec$/i.test(trimmed)) return true
+  if (/^in\s+\/Users\/.+$/i.test(trimmed)) return true
+
+  return false
 }
 
 function broadcastTeamEvent(
@@ -191,7 +232,10 @@ function broadcastTeamEvent(
     stage?: string
     kind?: 'info' | 'status' | 'blocker' | string
     initiativeId?: string
+    initiativeTitle?: string
     discussionId?: string
+    discussionTitle?: string
+    decisionQuestion?: string
     refs?: string[]
   } = {}
 ) {
@@ -207,7 +251,10 @@ function broadcastTeamEvent(
     stage: options.stage ?? 'system',
     kind: options.kind ?? 'info',
     initiativeId: options.initiativeId,
+    initiativeTitle: options.initiativeTitle,
     discussionId: options.discussionId,
+    discussionTitle: options.discussionTitle,
+    decisionQuestion: options.decisionQuestion,
     refs: options.refs ?? [],
   })
   wss.clients.forEach((client) => {
@@ -319,31 +366,6 @@ function observerStateForBrain(brainId: string) {
   }
 }
 
-function v2AutopilotStateForBrain(brainId: string) {
-  const autopilot = v2Autopilots.get(brainId)
-  if (!autopilot) return { active: false, startedAt: null as string | null, ticks: 0 }
-  return { active: true, startedAt: autopilot.startedAt, ticks: autopilot.ticks }
-}
-
-function runV2AutopilotTick(wss: WebSocketServer, brainId: string) {
-  const autopilot = v2Autopilots.get(brainId)
-  if (!autopilot) return
-  autopilot.ticks += 1
-  const result = runV2McpCall(brainId, 'workflow.tick', {})
-  if (result.event) {
-    broadcastTeamEvent(wss, brainId, result.event.message, {
-      id: result.event.id,
-      actor: result.event.actor,
-      layer: result.event.layer,
-      stage: result.event.stage,
-      kind: 'status',
-      initiativeId: result.event.initiativeId,
-      discussionId: result.event.discussionId,
-      refs: result.event.refs,
-    })
-  }
-}
-
 function runObserverTick(wss: WebSocketServer, brainId: string): { added: number; totalIssues: number } {
   const observer = teamObservers.get(brainId)
   if (!observer) return { added: 0, totalIssues: 0 }
@@ -393,7 +415,8 @@ function startCodexRunForSuggestion(wss: WebSocketServer, brainId: string) {
   }
 
   const suggestion = getSuggestedTask(brainId)
-  const label = suggestion?.label ?? 'No suggestion available'
+  if (!suggestion?.label) return null
+  const label = suggestion.label
 
   const run: BrainRun = {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -476,6 +499,18 @@ function startCodexRunForSuggestion(wss: WebSocketServer, brainId: string) {
   return run
 }
 
+const preflight = verifyNextBuildArtifacts(projectRoot)
+if (!dev && !preflight.ok) {
+  console.error(
+    [
+      '> Brian startup blocked: missing Next.js build artifacts.',
+      '> Run `npm run build --workspace=packages/web` then restart.',
+      `> Missing:\n${preflight.missing.map((rel) => `- ${rel}`).join('\n')}`,
+    ].join('\n')
+  )
+  process.exit(1)
+}
+
 app.prepare().then(() => {
   const server = createServer((req, res) => {
     const parsedUrl = parse(req.url ?? '/', true)
@@ -534,7 +569,34 @@ app.prepare().then(() => {
 
               runTeamMcpCall(brainId, 'team.clear_merged_queue', {})
               const result = runTeamMcpCall(brainId, 'team.trigger_suggested', {})
+              if (result.message === 'no_suggestion_available') {
+                if (ws.readyState === WebSocket.OPEN) {
+                  ws.send(JSON.stringify({ type: 'mcp.result', id: callId, ok: true, result }))
+                  ws.send(JSON.stringify({ type: 'execution_steps', data: result.snapshot.executionSteps }))
+                  ws.send(JSON.stringify({ type: 'handoffs', data: result.snapshot.handoffs }))
+                }
+                broadcastTeamEvent(wss, brainId, 'start_blocked:no_suggestion_available', {
+                  actor: 'mission-control',
+                  stage: 'blocker',
+                  kind: 'blocker',
+                })
+                return
+              }
               const run = startCodexRunForSuggestion(wss, brainId)
+              if (!run) {
+                const blocked = { ...result, message: 'start_blocked:no_suggestion_available' }
+                if (ws.readyState === WebSocket.OPEN) {
+                  ws.send(JSON.stringify({ type: 'mcp.result', id: callId, ok: true, result: blocked }))
+                  ws.send(JSON.stringify({ type: 'execution_steps', data: blocked.snapshot.executionSteps }))
+                  ws.send(JSON.stringify({ type: 'handoffs', data: blocked.snapshot.handoffs }))
+                }
+                broadcastTeamEvent(wss, brainId, blocked.message, {
+                  actor: 'mission-control',
+                  stage: 'blocker',
+                  kind: 'blocker',
+                })
+                return
+              }
               if (ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({ type: 'mcp.result', id: callId, ok: true, result: { ...result, run } }))
                 ws.send(JSON.stringify({ type: 'execution_steps', data: result.snapshot.executionSteps }))
@@ -555,7 +617,7 @@ app.prepare().then(() => {
                     run,
                     active,
                     observer: observerStateForBrain(brainId),
-                    workflowAutopilot: v2AutopilotStateForBrain(brainId),
+                    workflowAutopilot: runV2McpCall(brainId, 'workflow.autopilot.state', {}).autopilot,
                   },
                 }))
               }
@@ -640,64 +702,45 @@ app.prepare().then(() => {
               return
             }
 
-            if (method === 'workflow.autopilot.state') {
-              if (ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({
-                  type: 'mcp.result',
-                  id: callId,
-                  ok: true,
-                  result: { message: 'workflow.autopilot.state', autopilot: v2AutopilotStateForBrain(brainId) },
-                }))
+            if (method === 'team.generate_handoff') {
+              const now = new Date().toISOString()
+              const existingRun = activeRuns.get(brainId)
+              const fallbackSuggestion = getSuggestedTask(brainId)?.label ?? 'Manual mission checkpoint'
+              const syntheticRun: BrainRun = {
+                id: `manual-${Date.now()}`,
+                brainId,
+                status: existingRun?.status === 'blocked' ? 'blocked' : 'completed',
+                startedAt: existingRun?.startedAt ?? now,
+                endedAt: now,
+                label: existingRun?.label ?? fallbackSuggestion,
+                actor: existingRun?.actor ?? 'project-operator',
+                blockerReason: existingRun?.blockerReason,
               }
-              return
-            }
+              const handoffPath = createAutoHandoff(brainId, syntheticRun)
+              const snapshot = runTeamMcpCall(brainId, 'team.get_snapshot', {})
 
-            if (method === 'workflow.autopilot.start') {
-              const existing = v2Autopilots.get(brainId)
-              if (!existing) {
-                const timer = setInterval(() => {
-                  try {
-                    runV2AutopilotTick(wss, brainId)
-                  } catch (error) {
-                    broadcastTeamEvent(wss, brainId, `v2_autopilot_failed:${error instanceof Error ? error.message : 'unknown_error'}`, {
-                      actor: 'project-operator',
-                      stage: 'blocker',
-                      kind: 'blocker',
-                    })
-                  }
-                }, 6000)
-                v2Autopilots.set(brainId, {
-                  brainId,
-                  startedAt: new Date().toISOString(),
-                  ticks: 0,
-                  timer,
+              if (handoffPath) {
+                broadcastTeamEvent(wss, brainId, `handoff_created:${handoffPath}`, {
+                  actor: 'project-operator',
+                  stage: 'verification',
+                  kind: 'status',
+                  refs: [handoffPath],
                 })
-                runV2AutopilotTick(wss, brainId)
               }
-              if (ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({
-                  type: 'mcp.result',
-                  id: callId,
-                  ok: true,
-                  result: { message: 'workflow.autopilot.started', autopilot: v2AutopilotStateForBrain(brainId) },
-                }))
-              }
-              return
-            }
 
-            if (method === 'workflow.autopilot.stop') {
-              const active = v2Autopilots.get(brainId)
-              if (active) {
-                clearInterval(active.timer)
-                v2Autopilots.delete(brainId)
-              }
               if (ws.readyState === WebSocket.OPEN) {
                 ws.send(JSON.stringify({
                   type: 'mcp.result',
                   id: callId,
                   ok: true,
-                  result: { message: 'workflow.autopilot.stopped', autopilot: v2AutopilotStateForBrain(brainId) },
+                  result: {
+                    message: handoffPath ? `handoff_created:${handoffPath}` : 'handoff_not_created',
+                    handoffPath,
+                    snapshot: snapshot.snapshot,
+                  },
                 }))
+                ws.send(JSON.stringify({ type: 'execution_steps', data: snapshot.snapshot.executionSteps }))
+                ws.send(JSON.stringify({ type: 'handoffs', data: snapshot.snapshot.handoffs }))
               }
               return
             }
@@ -714,7 +757,10 @@ app.prepare().then(() => {
                     stage: result.event.stage,
                     kind: 'status',
                     initiativeId: result.event.initiativeId,
+                    initiativeTitle: result.event.initiativeTitle,
                     discussionId: result.event.discussionId,
+                    discussionTitle: result.event.discussionTitle,
+                    decisionQuestion: result.event.decisionQuestion,
                     refs: result.event.refs,
                   })
                 }
@@ -784,9 +830,7 @@ app.prepare().then(() => {
     console.log('\n> Shutting down...')
     wss.clients.forEach((client) => client.close())
     for (const observer of teamObservers.values()) clearInterval(observer.timer)
-    for (const autopilot of v2Autopilots.values()) clearInterval(autopilot.timer)
     teamObservers.clear()
-    v2Autopilots.clear()
     clientWatchers.forEach(({ close }) => close())
     globalCleanups.forEach((cleanup) => cleanup())
     server.close(() => process.exit(0))
@@ -794,4 +838,8 @@ app.prepare().then(() => {
 
   process.on('SIGTERM', shutdown)
   process.on('SIGINT', shutdown)
+}).catch((error) => {
+  const message = error instanceof Error ? error.stack ?? error.message : String(error)
+  console.error(`> Brian server failed during Next prepare:\n${message}`)
+  process.exit(1)
 })

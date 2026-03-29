@@ -8,7 +8,11 @@ import TabBar, { type Tab } from './tab-bar';
 import FileViewer from './file-viewer';
 import RightPane from './right-pane';
 import TeamTracker from './team-tracker';
+import CeoOverview from './ceo-overview';
+import TribeDirection from './tribe-direction';
 import DirectorConsole from './director-console';
+import AgentsWorkflow from './agents-workflow';
+import WorkflowRibbon from './workflow-ribbon';
 import { ConnectionStatusIndicator } from './connection-status';
 import { ShareButton } from './share-button';
 import BrainLoader from './brain-loader';
@@ -44,9 +48,12 @@ interface BrainLayoutProps {
   brainName?: string; brainDescription?: string;
 }
 
-const GRAPH_TAB: Tab = { id: 'graph', label: 'Graph View' };
-const TEAM_TAB: Tab = { id: 'team', label: 'Team Tracker' };
-const DIRECTOR_TAB: Tab = { id: 'director', label: 'Director Console' };
+const GRAPH_TAB: Tab = { id: 'graph', label: 'Graph + Notes' };
+const TEAM_TAB: Tab = { id: 'mission-control', label: 'Mission Control' };
+const TRIBE_TAB: Tab = { id: 'tribe-direction', label: 'Tribe' };
+const DIRECTORS_TAB: Tab = { id: 'directors', label: 'Directors' };
+const MISSION_TAB: Tab = { id: 'mission', label: 'CEO Mission' };
+const AGENTS_TAB: Tab = { id: 'agents-workflow', label: 'Agents + Workflow' };
 
 export function BrainLayout({
   brainId, files: initialFiles, links: initialLinks,
@@ -75,12 +82,19 @@ export function BrainLayout({
     if (mobile) setSidebarOpen(false);
   }, []);
 
-  const [activeTabId, setActiveTabId] = useState('director');
-  const [tabs, setTabs] = useState<Tab[]>([GRAPH_TAB, TEAM_TAB, DIRECTOR_TAB]);
+  const [activeTabId, setActiveTabId] = useState('mission');
+  const [tabs, setTabs] = useState<Tab[]>([MISSION_TAB, DIRECTORS_TAB, TRIBE_TAB, TEAM_TAB, GRAPH_TAB, AGENTS_TAB]);
   useEffect(() => {
     const requestedTab = new URLSearchParams(window.location.search).get('tab')
     if (!requestedTab) return
-    if (requestedTab === 'graph' || requestedTab === 'team' || requestedTab === 'director') {
+    if (
+      requestedTab === 'graph' ||
+      requestedTab === 'mission-control' ||
+      requestedTab === 'tribe-direction' ||
+      requestedTab === 'directors' ||
+      requestedTab === 'mission' ||
+      requestedTab === 'agents-workflow'
+    ) {
       setActiveTabId(requestedTab)
     }
   }, [])
@@ -143,14 +157,14 @@ export function BrainLayout({
   }
 
   function handleCloseTab(tabId: string) {
-    if (tabId === 'graph' || tabId === 'team' || tabId === 'director') return;
+    if (tabId === 'graph' || tabId === 'mission-control' || tabId === 'tribe-direction' || tabId === 'directors' || tabId === 'mission' || tabId === 'agents-workflow') return;
     setTabs((prev) => prev.filter((t) => t.id !== tabId));
     if (activeTabId === tabId) setActiveTabId('graph');
   }
 
   function handleCloseOthers(tabId: string) {
-    setTabs((prev) => prev.filter((t) => t.id === 'graph' || t.id === 'team' || t.id === 'director' || t.id === tabId));
-    if (activeTabId !== tabId && activeTabId !== 'graph' && activeTabId !== 'team' && activeTabId !== 'director') setActiveTabId(tabId);
+    setTabs((prev) => prev.filter((t) => t.id === 'graph' || t.id === 'mission-control' || t.id === 'tribe-direction' || t.id === 'directors' || t.id === 'mission' || t.id === 'agents-workflow' || t.id === tabId));
+    if (activeTabId !== tabId && activeTabId !== 'graph' && activeTabId !== 'mission-control' && activeTabId !== 'tribe-direction' && activeTabId !== 'directors' && activeTabId !== 'mission' && activeTabId !== 'agents-workflow') setActiveTabId(tabId);
   }
 
   function handleCloseToRight(tabId: string) {
@@ -167,6 +181,12 @@ export function BrainLayout({
   function handleWikilinkClick(targetPath: string) {
     const file = pathToFile.get(targetPath);
     if (file) openFileTab(file.id, file.path);
+  }
+
+  function handleOpenRecord(pathOrTarget: string) {
+    const target = pathOrTarget.replace(/^\//, '').replace(/\.md$/i, '')
+    const file = pathToFile.get(pathOrTarget) ?? pathToFile.get(target) ?? pathToFile.get(`${target}.md`)
+    if (file) openFileTab(file.id, file.path)
   }
 
   function handleSelectHandoff(fileId: string, filePath: string) {
@@ -201,6 +221,7 @@ export function BrainLayout({
 
       <main className="flex flex-1 flex-col overflow-hidden">
         <TabBar tabs={tabs} activeTabId={activeTabId} onSelectTab={setActiveTabId} onCloseTab={handleCloseTab} onCloseOthers={handleCloseOthers} onCloseToRight={handleCloseToRight} />
+        <WorkflowRibbon brainId={brainId} activeTabId={activeTabId} />
 
         <div className="relative flex-1 overflow-y-auto">
           {activeTabId === 'graph' && (
@@ -221,15 +242,21 @@ export function BrainLayout({
             </div>
           ) : activeTabId === 'graph' ? (
             <GraphView files={files} links={links} onSelectFile={openFileTab} />
-          ) : activeTabId === 'team' ? (
+          ) : activeTabId === 'mission-control' ? (
             <TeamTracker
               brainId={brainId}
               executionSteps={executionSteps}
               handoffs={handoffs}
               refreshSnapshot={refreshSnapshot}
             />
-          ) : activeTabId === 'director' ? (
+          ) : activeTabId === 'tribe-direction' ? (
+            <TribeDirection brainId={brainId} onOpenRecord={handleOpenRecord} />
+          ) : activeTabId === 'directors' ? (
             <DirectorConsole brainId={brainId} />
+          ) : activeTabId === 'mission' ? (
+            <CeoOverview brainId={brainId} onOpenRecord={handleOpenRecord} />
+          ) : activeTabId === 'agents-workflow' ? (
+            <AgentsWorkflow brainId={brainId} />
           ) : loadingFile === activeTabId ? (
             <BrainLoader />
           ) : activeFileContent ? (

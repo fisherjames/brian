@@ -489,44 +489,89 @@ function hasVerificationForStep(step: ExecutionStep | undefined): boolean {
   return (step?.tasks_json ?? []).some((task) => task.done && task.text.toUpperCase().startsWith('VERIFY:'))
 }
 
+function slugify(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 42)
+}
+
+function selectSuggestionStep(snapshot: Snapshot): ExecutionStep | null {
+  const teamSteps = snapshot.executionSteps.filter((s) => s.phase_number === 99)
+  const source = teamSteps.length > 0 ? teamSteps : snapshot.executionSteps
+  return (
+    source.find((s) => s.status === 'in_progress') ??
+    source.find((s) => s.status === 'not_started') ??
+    source.find((s) => s.status !== 'completed') ??
+    source[0] ??
+    null
+  )
+}
+
 function findSuggested(snapshot: Snapshot, brainPath: string): TeamSuggestion | null {
   const sourceSteps = snapshot.executionSteps.filter((s) => s.phase_number === 99)
-  const steps = sourceSteps.length > 0 ? sourceSteps : snapshot.executionSteps
+  const candidateSets = sourceSteps.length > 0 ? [sourceSteps, snapshot.executionSteps] : [snapshot.executionSteps]
   const normalizeTaskText = (value: string) =>
     value
       .replace(/^(NEXT|MERGE|VERIFY|NOTE|BLOCKER):\s*/i, '')
       .trim()
       .toLowerCase()
-  for (const step of steps) {
-    const tasks = step.tasks_json ?? []
-    for (let i = 0; i < tasks.length; i++) {
-      const task = tasks[i]
-      if (!task.done && task.text.toUpperCase().startsWith('NEXT:')) {
-        return { stepId: step.id, taskIndex: i, label: task.text.replace(/^NEXT:\s*/i, '') }
+
+  for (const steps of candidateSets) {
+    for (const step of steps) {
+      const tasks = step.tasks_json ?? []
+      for (let i = 0; i < tasks.length; i++) {
+        const task = tasks[i]
+        if (!task.done && task.text.toUpperCase().startsWith('NEXT:')) {
+          return { stepId: step.id, taskIndex: i, label: task.text.replace(/^NEXT:\s*/i, '') }
+        }
       }
     }
-  }
-  const handoffRecommendation = latestHandoffRecommendation(brainPath, snapshot)
-  if (handoffRecommendation) {
-    const normalizedRecommendation = normalizeTaskText(handoffRecommendation)
-    const isStaleRecommendation = steps.some((step) =>
-      (step.tasks_json ?? []).some((task) => normalizeTaskText(task.text) === normalizedRecommendation)
-    )
-    if (isStaleRecommendation) {
-      const unstarted = steps.find((s) => s.status === 'not_started')
-      if (unstarted) return { stepId: unstarted.id, label: unstarted.title }
-      return null
+
+    const handoffRecommendation = latestHandoffRecommendation(brainPath, snapshot)
+    if (handoffRecommendation) {
+      const normalizedRecommendation = normalizeTaskText(handoffRecommendation)
+      const isStaleRecommendation = steps.some((step) =>
+        (step.tasks_json ?? []).some((task) => normalizeTaskText(task.text) === normalizedRecommendation)
+      )
+      if (isStaleRecommendation) {
+        const unstarted = steps.find((s) => s.status === 'not_started')
+        if (unstarted) return { stepId: unstarted.id, label: unstarted.title }
+      } else {
+        const fallbackStepId =
+          steps.find((s) => s.status === 'in_progress')?.id ??
+          steps.find((s) => s.status === 'not_started')?.id ??
+          steps.find((s) => s.status !== 'completed')?.id ??
+          steps[0]?.id
+        if (fallbackStepId) return { stepId: fallbackStepId, label: handoffRecommendation }
+      }
     }
-    const fallbackStepId =
-      steps.find((s) => s.status === 'in_progress')?.id ??
-      steps.find((s) => s.status === 'not_started')?.id ??
-      steps[0]?.id
-    if (!fallbackStepId) return null
-    return { stepId: fallbackStepId, label: handoffRecommendation }
+
+    const unstarted = steps.find((s) => s.status === 'not_started')
+    if (unstarted) return { stepId: unstarted.id, label: unstarted.title }
+    const inProgress = steps.find((s) => s.status === 'in_progress')
+    if (inProgress) return { stepId: inProgress.id, label: inProgress.title }
   }
-  const unstarted = steps.find((s) => s.status === 'not_started')
-  if (unstarted) return { stepId: unstarted.id, label: unstarted.title }
+
   return null
+}
+
+function ensureSyntheticNextTask(brainPath: string, snapshot: Snapshot): TeamSuggestion | null {
+  const targetStep = selectSuggestionStep(snapshot)
+  if (!targetStep) return null
+
+  const categories = ['incremental', 'dream_feature', 'refactor', 'bugfix_observer'] as const
+  const existingNext = snapshot.executionSteps
+    .flatMap((step) => step.tasks_json ?? [])
+    .filter((task) => task.text.toUpperCase().startsWith('NEXT:'))
+  const category = categories[existingNext.length % categories.length]
+  const feature = `${category.replace(/_/g, ' ')}: ${targetStep.title.trim() || `mission iteration ${new Date().toISOString().slice(11, 19)}`}`
+  const branchSlug = slugify(feature) || `mission-${Date.now().toString(36)}`
+  const lane = targetStep.phase_number === 99 ? category : 'execution'
+  const taskText = `NEXT: feature="${feature}" lane=${lane} worktree=feature/${branchSlug} image=pending breaking=none`
+  mutateStepFile(brainPath, { stepId: targetStep.id, appendTaskText: taskText })
+  return findSuggested(snapshotForBrain(brainPath), brainPath)
 }
 
 export function getSuggestedTask(brainId: string): TeamSuggestion | null {
@@ -591,7 +636,8 @@ export function runTeamMcpCall(
 
   if (method === 'team.get_suggested') {
     const snapshot = snapshotForBrain(brainPath)
-    const suggested = findSuggested(snapshot, brainPath)?.label ?? ''
+    const ensured = findSuggested(snapshot, brainPath) ?? ensureSyntheticNextTask(brainPath, snapshot)
+    const suggested = ensured?.label ?? ''
     return { message: 'suggested_loaded', snapshot, suggested }
   }
 
@@ -935,11 +981,17 @@ export function runTeamMcpCall(
 
   if (method === 'team.trigger_suggested') {
     const current = snapshotForBrain(brainPath)
-    const suggestion = findSuggested(current, brainPath)
+    let suggestion = findSuggested(current, brainPath) ?? ensureSyntheticNextTask(brainPath, current)
     if (!suggestion) {
       return { message: 'no_suggestion_available', snapshot: current }
     }
-    const target = current.executionSteps.find((s) => s.id === suggestion.stepId)
+    if (typeof suggestion.taskIndex !== 'number') {
+      const synthetic = ensureSyntheticNextTask(brainPath, snapshotForBrain(brainPath))
+      if (synthetic) suggestion = synthetic
+    }
+
+    const latest = snapshotForBrain(brainPath)
+    const target = latest.executionSteps.find((s) => s.id === suggestion.stepId)
     if (target?.status === 'not_started') {
       mutateStepFile(brainPath, { stepId: suggestion.stepId, status: 'in_progress' })
     }

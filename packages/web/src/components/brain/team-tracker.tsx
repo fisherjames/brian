@@ -134,13 +134,23 @@ export default function TeamTracker({
   const [mergeQueueText, setMergeQueueText] = useState('')
   const [dragMerge, setDragMerge] = useState<{ stepId: string; taskIndex: number } | null>(null)
   const [observer, setObserver] = useState<SnapshotResult['observer'] | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [hasSeenConnected, setHasSeenConnected] = useState(false)
+  const [connectionGraceExpired, setConnectionGraceExpired] = useState(false)
   const { connected, events, call } = useMcpTeam(brainId)
 
   useEffect(() => setSteps(executionSteps), [executionSteps])
   useEffect(() => setHandoffList(handoffs), [handoffs])
+  useEffect(() => {
+    const timer = window.setTimeout(() => setConnectionGraceExpired(true), 8000)
+    return () => window.clearTimeout(timer)
+  }, [])
+  useEffect(() => {
+    if (connected) setHasSeenConnected(true)
+  }, [connected])
 
   useEffect(() => {
-    const id = setInterval(async () => {
+    const refreshRuntimeState = async () => {
       const [runRes, repoRes, suggestionRes] = await Promise.all([
         call<{ run: SnapshotResult['run']; active: boolean; observer?: SnapshotResult['observer'] }>('team.get_run_state'),
         call<{ repo: RepoState }>('team.get_repo_state'),
@@ -153,7 +163,13 @@ export default function TeamTracker({
       }
       if (repoRes.ok && repoRes.result?.repo) setRepoState(repoRes.result.repo)
       if (suggestionRes.ok && suggestionRes.result) setServerSuggested(suggestionRes.result.suggested ?? '')
-    }, 2500)
+    }
+
+    void refreshRuntimeState()
+    const id = setInterval(async () => {
+      if (document.hidden) return
+      await refreshRuntimeState()
+    }, 5000)
     return () => clearInterval(id)
   }, [call])
 
@@ -192,7 +208,9 @@ export default function TeamTracker({
     if (nextOpen) return `Start: ${nextOpen.text}`
     const unstarted = teamSteps.find((s) => s.status === 'not_started')
     if (unstarted) return `Start step ${unstarted.phase_number}.${unstarted.step_number}: ${unstarted.title}`
-    return 'No pending suggestion'
+    const inProgress = teamSteps.find((s) => s.status === 'in_progress')
+    if (inProgress) return `Continue step ${inProgress.phase_number}.${inProgress.step_number}: ${inProgress.title}`
+    return 'Awaiting backlog synthesis'
   }, [openNextItems, serverSuggested, teamSteps])
 
   const verificationStepId = useMemo(() => {
@@ -220,7 +238,8 @@ export default function TeamTracker({
   const needsVerification = mergeItems.some((item) => !item.done && !verifiedStepIds.has(item.stepId))
   const hardBlockers = useMemo(() => {
     const items: Array<{ message: string; resolution: string }> = []
-    if (!connected) {
+    const shouldShowOffline = !connected && (hasSeenConnected || connectionGraceExpired)
+    if (shouldShowOffline) {
       items.push({ message: 'WebSocket/MCP connection is offline.', resolution: 'Wait for reconnect or refresh the page.' })
     }
     for (const blocker of repoState?.hardBlockers ?? []) {
@@ -230,7 +249,7 @@ export default function TeamTracker({
       items.push({ message: `Run blocked: ${runState.blockerReason || runState.status}`, resolution: 'Resolve blocker or pause/cleanup before restarting.' })
     }
     return items
-  }, [connected, repoState?.hardBlockers, runActive, runState?.blockerReason, runState?.status])
+  }, [connected, connectionGraceExpired, hasSeenConnected, repoState?.hardBlockers, runActive, runState?.blockerReason, runState?.status])
 
   const systemStatus = useMemo((): 'working' | 'awaiting_approval' | 'blocked' | 'idle' => {
     if (hardBlockers.length > 0) return 'blocked'
@@ -261,11 +280,24 @@ export default function TeamTracker({
     if (!/^no suggestion available$/i.test(suggested) && !/^no pending suggestion$/i.test(suggested)) return suggested
     return ''
   }, [openNextItems, runActive, runState?.label, suggested])
+  const hasRunnableSuggestion = useMemo(
+    () => !/^no suggestion available$/i.test(suggested) && !/^no pending suggestion$/i.test(suggested),
+    [suggested]
+  )
 
   async function apply(method: string, params: Record<string, unknown>, key: string) {
+    if (!connected) {
+      setActionError('Mission control is connecting to MCP. Wait a moment and retry.')
+      return
+    }
+    setActionError(null)
     setBusy(key)
     try {
       const res = await call<SnapshotResult>(method, params)
+      if (!res.ok) {
+        setActionError(res.error ? `Action failed: ${res.error}` : 'Action failed.')
+        return
+      }
       if (res.ok && res.result?.snapshot) {
         setSteps(res.result.snapshot.executionSteps)
         setHandoffList(res.result.snapshot.handoffs)
@@ -344,6 +376,7 @@ export default function TeamTracker({
             <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${statusPill(systemStatus)}`}>{systemStatus.replace('_', ' ')}</span>
             <span className="text-[12px] text-text-muted">Branch: {repoState?.branch ?? '...'}</span>
           </div>
+          <p className="mt-1 text-[12px] text-text-muted">Squad-level orchestration for active execution, verification, and worktree merge flow.</p>
           <p className="mt-1 text-[12px] text-text-muted">{suggested}</p>
           {currentTask && (
             <div className={`mt-2 rounded-md border p-2 ${systemStatus === 'blocked' ? 'border-[#D95B5B]/40 bg-[#D95B5B]/10' : 'border-border/70 bg-bg'}`}>
@@ -351,11 +384,26 @@ export default function TeamTracker({
               <p className={`text-[12px] ${systemStatus === 'blocked' ? 'text-[#D95B5B]' : 'text-text-secondary'}`}>{currentTask}</p>
             </div>
           )}
+          {!hasRunnableSuggestion && (
+            <div className="mt-2 rounded-md border border-border/70 bg-bg p-2 text-[12px] text-text-muted">
+              No runnable suggestion yet. Add a `NEXT:` task or start observer to synthesize the next queue.
+            </div>
+          )}
+          {!connected && (
+            <div className="mt-2 rounded-md border border-[#E8A830]/40 bg-[#E8A830]/10 p-2 text-[12px] text-[#8C6A1A]">
+              Connecting to MCP websocket. Actions enable automatically once connected.
+            </div>
+          )}
+          {actionError && (
+            <div className="mt-2 rounded-md border border-[#D95B5B]/40 bg-[#D95B5B]/10 p-2 text-[12px] text-[#D95B5B]">
+              {actionError}
+            </div>
+          )}
 
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <button
               onClick={() => apply('team.start_next_task', {}, 'start')}
-              disabled={busy === 'start' || hardBlockers.length > 0}
+              disabled={busy === 'start' || hardBlockers.length > 0 || !hasRunnableSuggestion || !connected}
               className="inline-flex items-center gap-1.5 rounded-md border border-border bg-bg px-2.5 py-1.5 text-[12px] text-text-secondary hover:bg-text/5 disabled:opacity-50"
             >
               <Play className="h-3.5 w-3.5" />
@@ -363,7 +411,7 @@ export default function TeamTracker({
             </button>
             <button
               onClick={() => apply('team.pause_run', {}, 'pause')}
-              disabled={busy === 'pause' || runState?.status !== 'running'}
+              disabled={busy === 'pause' || runState?.status !== 'running' || !connected}
               className="inline-flex items-center gap-1.5 rounded-md border border-border bg-bg px-2.5 py-1.5 text-[12px] text-text-secondary hover:bg-text/5 disabled:opacity-50"
             >
               <Pause className="h-3.5 w-3.5" />
@@ -371,35 +419,42 @@ export default function TeamTracker({
             </button>
             <button
               onClick={() => apply('team.get_conflict_summary', {}, 'conflicts')}
-              disabled={busy === 'conflicts' || !repoState?.hasConflicts}
+              disabled={busy === 'conflicts' || !repoState?.hasConflicts || !connected}
               className="rounded-md border border-border bg-bg px-2.5 py-1.5 text-[12px] text-text-secondary hover:bg-text/5 disabled:opacity-50"
             >
               View Conflict
             </button>
             <button
               onClick={() => apply('team.merge_queue_dry_run', {}, 'merge-queue-dry')}
-              disabled={busy === 'merge-queue-dry'}
+              disabled={busy === 'merge-queue-dry' || !connected}
               className="rounded-md border border-border bg-bg px-2.5 py-1.5 text-[12px] text-text-secondary hover:bg-text/5 disabled:opacity-50"
             >
               Dry Run Queue
             </button>
             <button
               onClick={() => apply('team.merge_queue_execute', {}, 'merge-queue-exec')}
-              disabled={busy === 'merge-queue-exec'}
+              disabled={busy === 'merge-queue-exec' || !connected || needsVerification || Boolean(repoState?.hasConflicts)}
               className="rounded-md border border-border bg-bg px-2.5 py-1.5 text-[12px] text-text-secondary hover:bg-text/5 disabled:opacity-50"
             >
-              Merge Queue
+              Merge Worktrees
             </button>
             <button
               onClick={() => apply('team.cleanup_worktrees', {}, 'cleanup-wt')}
-              disabled={busy === 'cleanup-wt'}
+              disabled={busy === 'cleanup-wt' || !connected}
               className="rounded-md border border-border bg-bg px-2.5 py-1.5 text-[12px] text-text-secondary hover:bg-text/5 disabled:opacity-50"
             >
               Cleanup Worktrees
             </button>
             <button
+              onClick={() => apply('team.generate_handoff', {}, 'generate-handoff')}
+              disabled={busy === 'generate-handoff' || !connected}
+              className="rounded-md border border-border bg-bg px-2.5 py-1.5 text-[12px] text-text-secondary hover:bg-text/5 disabled:opacity-50"
+            >
+              Generate Handoff
+            </button>
+            <button
               onClick={() => apply('team.cleanup_worktrees', { force: true }, 'cleanup-wt-force')}
-              disabled={busy === 'cleanup-wt-force'}
+              disabled={busy === 'cleanup-wt-force' || !connected}
               className="rounded-md border border-border bg-bg px-2.5 py-1.5 text-[12px] text-text-secondary hover:bg-text/5 disabled:opacity-50"
             >
               Force Cleanup
@@ -410,14 +465,14 @@ export default function TeamTracker({
             </span>
             <button
               onClick={() => apply('team.observer_start', {}, 'observer-start')}
-              disabled={busy === 'observer-start' || observer?.active}
+              disabled={busy === 'observer-start' || observer?.active || !connected}
               className="rounded-md border border-border bg-bg px-2.5 py-1.5 text-[12px] text-text-secondary hover:bg-text/5 disabled:opacity-50"
             >
               Start Observer
             </button>
             <button
               onClick={() => apply('team.observer_stop', {}, 'observer-stop')}
-              disabled={busy === 'observer-stop' || !observer?.active}
+              disabled={busy === 'observer-stop' || !observer?.active || !connected}
               className="rounded-md border border-border bg-bg px-2.5 py-1.5 text-[12px] text-text-secondary hover:bg-text/5 disabled:opacity-50"
             >
               Stop Observer
@@ -527,7 +582,13 @@ export default function TeamTracker({
                   </span>
                 </button>
               ))}
-              {openNextItems.length === 0 && <p className="text-[12px] text-text-muted">No queued tasks.</p>}
+              {openNextItems.length === 0 && (
+                <p className="text-[12px] text-text-muted">
+                  {mergeItems.length > 0
+                    ? 'Queue is consumed. Complete verification/merge on active worktrees or run observer for new work.'
+                    : 'No queued tasks. Add `NEXT:` tasks with feature/worktree metadata or run observer.'}
+                </p>
+              )}
             </div>
           </div>
 
@@ -604,7 +665,9 @@ export default function TeamTracker({
                   </div>
                 )
               })}
-              {mergeItems.length === 0 && <p className="text-[12px] text-text-muted">No worktrees queued.</p>}
+              {mergeItems.length === 0 && (
+                <p className="text-[12px] text-text-muted">No worktrees queued. `MERGE:` items appear after a queued `NEXT:` item is triggered.</p>
+              )}
             </div>
           </div>
         </div>
@@ -629,11 +692,14 @@ export default function TeamTracker({
                   .replace(/^\[(stdout|stderr)\]\s*/i, '')
                   .replace(/^\+\s*/, '')
                   .trim()
+                if (!cleaned) return null
+                if (/^[0-9a-f]{8}-[0-9a-f-]{20,}$/i.test(cleaned)) return null
                 return (
                 <p key={`evt-${idx}`} className="text-[12px] text-text-secondary">
                   <span className="mr-1 text-text-muted">[{new Date(event.at).toLocaleTimeString('en-GB', { hour12: false })}]</span>
                   {event.actor ? <span className="mr-1 rounded bg-text/10 px-1 py-0.5 text-[10px] text-text-muted">{event.actor}</span> : null}
                   {event.stage ? <span className="mr-1 rounded bg-text/10 px-1 py-0.5 text-[10px] text-text-muted">{event.stage}</span> : null}
+                  <span className="mr-1 text-text-muted">•</span>
                   <span>{cleaned}</span>
                 </p>
                 )

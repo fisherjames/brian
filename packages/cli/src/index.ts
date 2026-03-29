@@ -14,6 +14,16 @@ const SERVER_JSON = path.join(CONFIG_DIR, 'server.json')
 const CODEX_SKILLS_DIR = path.join(os.homedir(), '.codex', 'skills')
 
 const VERSION = '0.2.0'
+const LEGACY_ALIAS_MAP: Record<string, string> = {
+  next: 'brian status',
+  mission: 'brian propose "<title>"',
+  spec: 'brian propose "<title>"',
+  feature: 'brian propose "<title>"',
+  sprint: 'brian plan <initiative-id>',
+  sync: 'brian doctrine-lint',
+  notes: 'brian brief',
+  'wrap-up': 'brian end',
+}
 
 type BrainEntry = {
   id: string
@@ -141,6 +151,32 @@ function hasFlag(args: string[], name: string): boolean {
 
 function isoNow(): string {
   return new Date().toISOString()
+}
+
+function appendLegacyTelemetry(brainRoot: string, legacyCommand: string, canonicalCommand: string) {
+  const meta = readBrainMeta(brainRoot)
+  if (!meta?.id) return
+  const eventFile = path.join(CONFIG_DIR, 'state', meta.id, 'events.ndjson')
+  const payload = {
+    id: crypto.randomUUID(),
+    at: isoNow(),
+    actor: 'project-operator',
+    layer: 'system',
+    stage: 'execution',
+    kind: 'legacy_command_used',
+    message: `${legacyCommand} -> ${canonicalCommand}`,
+    refs: [],
+  }
+  fs.mkdirSync(path.dirname(eventFile), { recursive: true })
+  fs.appendFileSync(eventFile, `${JSON.stringify(payload)}\n`, 'utf8')
+}
+
+function warnLegacyAlias(brainRoot: string | undefined, legacyCommand: string) {
+  const mapped = LEGACY_ALIAS_MAP[legacyCommand]
+  if (!mapped) return
+  console.log(`  Compatibility alias used: brian ${legacyCommand}`)
+  console.log(`  Canonical command: ${mapped}`)
+  if (brainRoot) appendLegacyTelemetry(brainRoot, `brian ${legacyCommand}`, mapped)
 }
 
 function humanNow(): string {
@@ -627,59 +663,14 @@ function recommendNextAction(brainRoot: string): { command: string; reason: stri
     if (active) {
       if (active.stage === 'intent') return { command: `brian propose "${active.title}"`, reason: `${active.id} is at intent stage.` }
       if (active.stage === 'proposal') return { command: `brian shape ${active.id}`, reason: `${active.id} needs tribe shaping.` }
+      if (active.stage === 'leadership_discussion') return { command: `brian decide ${active.id} "Approve direction for ${active.title}"`, reason: `${active.id} requires decision closure after discussion.` }
+      if (active.stage === 'director_decision') return { command: `brian decide ${active.id} "Resolve pending decision for ${active.title}"`, reason: `${active.id} is waiting on director decision.` }
       if (active.stage === 'tribe_shaping') return { command: `brian plan ${active.id}`, reason: `${active.id} needs squad planning.` }
       if (active.stage === 'squad_planning') return { command: 'brian work', reason: `${active.id} is ready for execution.` }
       if (active.stage === 'execution') return { command: 'brian brief', reason: `${active.id} is executing; generate a director briefing.` }
     }
   }
-
-  const parsed = readExecutionPlanSteps(brainRoot)
-  const defaultAction = { command: 'brian work', reason: 'Continue focused implementation work.' }
-  if (!parsed || parsed.steps.length === 0) return defaultAction
-
-  const inProgress = parsed.steps.find(step => step.status === 'in_progress' && step.phase !== 99)
-  if (inProgress) {
-    return {
-      command: `brian work --role frontend`,
-      reason: `${inProgress.id} is already in progress: ${inProgress.title}.`,
-    }
-  }
-
-  const blocked = parsed.steps.find(step => step.status === 'blocked' && step.phase !== 99)
-  if (blocked) {
-    return {
-      command: 'brian sync',
-      reason: `${blocked.id} is blocked. Reconcile blockers and merge order first.`,
-    }
-  }
-
-  const completedIds = new Set(
-    parsed.steps.filter(step => step.status === 'completed').map(step => step.id)
-  )
-  const ready = parsed.steps.find(step => (
-    step.phase !== 99 &&
-    step.status === 'not_started' &&
-    step.dependencies.every(dep => completedIds.has(dep))
-  ))
-  if (ready) {
-    return {
-      command: `brian plan ${ready.id}`,
-      reason: `${ready.id} is the next unblocked step: ${ready.title}.`,
-    }
-  }
-
-  const teamSteps = readTeamBoardSteps(brainRoot)
-  const hasOpenTeamBlocker = teamSteps.some(step =>
-    step.status === 'blocked' || step.title.toLowerCase().includes('block')
-  )
-  if (hasOpenTeamBlocker) {
-    return {
-      command: 'brian sync',
-      reason: 'Team board indicates unresolved blockers.',
-    }
-  }
-
-  return defaultAction
+  return { command: 'brian intent "Define next initiative objective"', reason: 'No active V2 initiative found.' }
 }
 
 function createSpecPacket(brainRoot: string, featureName: string): { slug: string; dir: string } {
@@ -967,24 +958,16 @@ function commandPromptSummary(brainRoot: string) {
   console.log('  - brian intent "<initiative intent>"')
   console.log('  - brian propose "<initiative title>"')
   console.log('  - brian shape <initiative-id>')
-  console.log('  - brian plan <initiative-id>        (or `brian plan EP-2` for legacy execution-plan step planning)')
-  console.log('  - brian next')
+  console.log('  - brian plan <initiative-id>')
   console.log('  - brian work [--role <role>]')
   console.log('  - brian end [--role <role>]')
   console.log('  - brian brief')
   console.log('  - brian decide <initiative-id> "<decision title>"')
   console.log('  - brian doctrine-lint')
   console.log('  - brian status')
-  console.log('  - brian mission <feature>')
   console.log('  - brian init')
   console.log('  - brian resume')
-  console.log('  - brian wrap-up')
-  console.log('  - brian notes <scope>')
-  console.log('  - brian plan <step>')
-  console.log('  - brian sprint')
-  console.log('  - brian sync')
-  console.log('  - brian spec <feature>')
-  console.log('  - brian feature <name> (alias for brian spec)')
+  console.log('  - compatibility aliases remain available with migration warnings')
   console.log('')
 }
 
@@ -1185,21 +1168,14 @@ function injectPackageScripts(brainRoot: string, preset: InitPreset) {
     'brain:intent': 'brian intent',
     'brain:propose': 'brian propose',
     'brain:shape': 'brian shape',
+    'brain:plan': 'brian plan',
+    'brain:work': 'brian work',
     'brain:brief': 'brian brief',
     'brain:decide': 'brian decide',
     'brain:doctrine-lint': 'brian doctrine-lint',
     'brain:resume': 'brian resume',
     'brain:status': 'brian status',
-    'brain:work': 'brian work',
     'brain:end': 'brian end',
-    'brain:sync': 'brian sync',
-    'brain:wrap': 'brian wrap-up',
-    'brain:notes': 'brian notes',
-    'brain:next': 'brian next',
-    'brain:plan': 'brian plan',
-    'brain:spec': 'brian spec',
-    'brain:mission': 'brian mission',
-    'brain:feature': 'brian spec',
   }
 
   let changed = false
@@ -1489,8 +1465,7 @@ Imported markdown docs from the repository should be linked here when you run in
 
 - Replace this with the real setup, run, test, and deploy commands for the project.
 - Capture any environment prerequisites or local services.
-${options.addPackageScripts ? '\n## Helper Commands\n- `npm run brain:viewer`\n- `npm run brain:next`\n- `npm run brain:work`\n- `npm run brain:end`\n- `npm run brain:status`\n- `npm run brain:mission -- "Feature Name"`\n- `npm run brain:spec -- "Feature Name"`\n- `npm run brain:sync`\n- `npm run brain:wrap`\n- `npm run brain:notes -- "<scope>"`\n' : ''}
-${options.addPackageScripts ? '\n## Canonical V2 Commands\n- `npm run brain:intent -- "<initiative intent>"`\n- `npm run brain:propose -- "<initiative title>"`\n- `npm run brain:shape -- <initiative-id>`\n- `npm run brain:plan -- <initiative-id>`\n- `npm run brain:work`\n- `npm run brain:brief`\n- `npm run brain:decide -- <initiative-id> "<decision title>"`\n- `npm run brain:status`\n- `npm run brain:doctrine-lint`\n' : ''}
+${options.addPackageScripts ? '\n## Canonical V2 Commands\n- `npm run brain:viewer`\n- `npm run brain:intent -- "<initiative intent>"`\n- `npm run brain:propose -- "<initiative title>"`\n- `npm run brain:shape -- <initiative-id>`\n- `npm run brain:plan -- <initiative-id>`\n- `npm run brain:work`\n- `npm run brain:brief`\n- `npm run brain:decide -- <initiative-id> "<decision title>"`\n- `npm run brain:status`\n- `npm run brain:doctrine-lint`\n- `npm run brain:end`\n' : ''}
 ${options.installSkills ? '\n## Managed Skills\n- Brian installs a shared Codex skill pack under `~/.codex/skills/` for core work, roles, and team orchestration.\n' : ''}
 `)
 
@@ -1501,13 +1476,12 @@ ${options.installSkills ? '\n## Managed Skills\n- Brian installs a shared Codex 
 ${hasCommands
   ? `1. Read [[index]], \`AGENTS.md\`, [[execution-plan]], and the latest handoff.
 2. Use initiative-centric commands as canonical flow: \`brian intent\`, \`brian propose\`, \`brian shape\`, \`brian plan\`, \`brian work\`, \`brian brief\`, \`brian decide\`, \`brian status\`.
-3. Use [[commands]] for compatibility and richer session loops when needed.
-4. Use \`brian mission "<feature>"\` for compatibility with legacy execution-plan/team-board workflows.
-5. Open the relevant area note before editing code or docs.
-6. Use \`brian notes "<scope>"\` after changing a top-level or workflow note.
-7. Keep queue items feature-length and worktree-mapped (\`feature/worktree/image/breaking\`).
-8. Record human verification in [[team-board]] before completing MERGE tasks.
-9. Create a new handoff before ending a meaningful session.`
+3. Use [[commands]] for run-loop details and consistency checks.
+4. Open the relevant area note before editing code or docs.
+5. Keep queue items feature-length and worktree-mapped (\`feature/worktree/image/breaking\`).
+6. Record human verification in [[team-board]] before completing MERGE tasks.
+7. Create a new handoff before ending a meaningful session.
+8. Treat legacy aliases as migration-only; convert to canonical commands immediately.`
   : `1. Read [[index]], \`AGENTS.md\`, [[execution-plan]], and the latest handoff.
 2. Inspect the relevant area before editing code.
 3. Make a narrow, testable change.
@@ -1552,12 +1526,12 @@ ${options.addPackageScripts ? 'npm run brain:work' : 'brian work --role frontend
 
 ## Canonical Planning
 \`\`\`bash
-brian plan EP-2
-${options.addPackageScripts ? 'npm run brain:plan -- EP-2' : ''}
+brian plan <initiative-id>
+${options.addPackageScripts ? 'npm run brain:plan -- <initiative-id>' : ''}
 \`\`\`
 
 ## Sequence
-1. Use \`brian plan\` to create a linked planning note from [[execution-plan]].
+1. Use \`brian plan\` to move an initiative into squad planning.
 2. Use Codex \`/plan\` inside the chat to refine that step into an implementation sequence.
 3. Record decisions and verification before editing code.
 `)
@@ -1568,15 +1542,15 @@ ${options.addPackageScripts ? 'npm run brain:plan -- EP-2' : ''}
 
 ## Canonical Spec-First Flow
 \`\`\`bash
-brian mission "Feature Name"
-${options.addPackageScripts ? 'npm run brain:mission -- "Feature Name"' : ''}
+brian propose "Feature Name"
+${options.addPackageScripts ? 'npm run brain:propose -- "Feature Name"' : ''}
 \`\`\`
 
 ## Sequence
-1. \`brian mission\` creates or updates a feature packet under [[../specs/specs]].
-2. It appends matching work items in [[../execution-plan]] and [[team-board]].
-3. Use Codex \`/plan\` to refine \`plan.md\` and \`tasks.md\`.
-4. End with verification in \`review.md\` and a handoff note.
+1. \`brian propose\` creates proposal-stage initiative records.
+2. Continue with \`brian shape\`, \`brian plan\`, and \`brian work\`.
+3. Keep team-board queue synced using feature/worktree metadata.
+4. End with verification evidence and a handoff note.
 `)
 
     writeFileIfMissing(path.join(docsRoot, 'commands', 'notes-loop.md'), `# notes loop
@@ -1585,14 +1559,14 @@ ${options.addPackageScripts ? 'npm run brain:mission -- "Feature Name"' : ''}
 
 ## Canonical Reconciliation
 \`\`\`bash
-brian notes "product"
-${options.addPackageScripts ? 'npm run brain:notes -- "Product"' : ''}
+brian brief
+${options.addPackageScripts ? 'npm run brain:brief' : ''}
 \`\`\`
 
 ## Sequence
-1. Run \`brian notes "<scope>"\` after changing a top-level or workflow note.
-2. Let Codex reconcile only the downstream notes that are now stale.
-3. Run \`brian sync\` after the update if you want an explicit graph check.
+1. Run \`brian brief\` after meaningful lifecycle or governance changes.
+2. Let the director briefing capture downstream state changes explicitly.
+3. Run \`brian doctrine-lint\` for an explicit integrity check.
 `)
 
     writeFileIfMissing(path.join(docsRoot, 'commands', 'team-board.md'), `# team board
@@ -2084,7 +2058,7 @@ function showWelcome(port: number) {
   console.log('  |  1. Open that project in a terminal                         |')
   console.log('  |  2. Run: brian init                                         |')
   console.log('  |  3. Run: brian intent "New initiative"                      |')
-  console.log('  |  4. Then: brian propose / brian shape / brian plan / work   |')
+  console.log('  |  4. Then: brian propose / brian shape / brian plan / brian work |')
   console.log('  |  5. Use brian brief + brian decide for director loop        |')
   console.log('  |                                                             |')
   console.log('  |  The brain will appear in the viewer automatically.         |')
@@ -2100,29 +2074,25 @@ function showHelp() {
 
   Usage:
     brian                           Start the viewer
+    brian init                      Create a Brian scaffold in the current project
+    brian status                    Show the current brain or all registered brains
     brian intent <text>             Capture initiative intent (V2)
     brian propose <name>            Create proposal-stage initiative (V2)
     brian shape <initiative-id>     Move initiative to tribe shaping stage (V2)
+    brian plan <initiative-id>      Move initiative to squad planning stage (V2)
+    brian work                      Launch Codex with managed Brian start context
+    brian end                       Create handoff + launch managed wrap-up context
     brian brief                     Generate director briefing note (V2)
     brian decide <id> <title>       Record director decision (V2)
     brian doctrine-lint             Validate workflow doctrine + governance hygiene (V2)
-    brian next                      Show one recommended next command
-    brian work                      Launch Codex with the managed Brian start prompt
-    brian end                       Create a handoff and launch the managed wrap-up prompt
-    brian status                    Show the current brain or all registered brains
-    brian mission <name>            Create spec packet + append execution/team work items
-    brian init                      Create a Brian scaffold in the current project
     brian resume                    Show the files to read before working
-    brian wrap-up                   Create the next handoff template
-    brian notes <scope>             Reconcile downstream notes after top-level edits
-    brian migrate                   Move a legacy layout into brian/.brian
-    brian plan [step]               V2 initiative plan (default) or legacy execution-plan step plan
-    brian sprint                    Create a sprint note from ready and in-progress work
-    brian sync                      Scan the brain for broken links and disconnected files
-    brian spec <name>               Create a spec packet under brian/specs/
-    brian feature <name>            Alias for brian spec <name>
+    brian migrate                   Migrate legacy layout into brian/.brian
     brian codex                     Show the Codex slash-command mapping for Brian
     brian help                      Show this help
+
+  Compatibility aliases (migration-only):
+    next | mission | spec | feature | sprint | sync | notes | wrap-up
+    (aliases remain supported but emit migration warnings)
 
   Viewer options:
     --port <number>                 Custom port (default: 3000)
@@ -2484,6 +2454,7 @@ async function main() {
       console.log('  Run `brian init` first.')
       return
     }
+    warnLegacyAlias(brainRoot, 'wrap-up')
 
     const handoffPath = createWrapUp(brainRoot)
     console.log(`  Created handoff template: ${handoffPath}`)
@@ -2537,7 +2508,7 @@ async function main() {
       console.log('  Migrated paths:')
       for (const item of moved) console.log(`  - ${item}`)
     }
-    console.log('  Next: run `brian resume` and `brian sync` to verify the new layout.')
+    console.log('  Next: run `brian resume` and `brian doctrine-lint` to verify the new layout.')
     return
   }
 
@@ -2554,12 +2525,13 @@ async function main() {
       console.log('  Usage: brian notes "<scope>"')
       return
     }
+    warnLegacyAlias(brainRoot, 'notes')
 
     const exitCode = await runInherited('codex', ['exec', '--full-auto', '--ephemeral', buildNotesPrompt(brainRoot, scope)], brainRoot)
     if (exitCode !== 0) {
       process.exit(exitCode)
     }
-    console.log('  Reconciliation finished. Run `brian sync` if you want an explicit graph check.')
+    console.log('  Reconciliation finished. Run `brian doctrine-lint` if you want an explicit integrity check.')
     return
   }
 
@@ -2570,19 +2542,13 @@ async function main() {
       console.log('  Run `brian init` first.')
       return
     }
+    warnLegacyAlias(brainRoot, 'next')
 
     const recommendation = recommendNextAction(brainRoot)
-    const latestHandoff = readLatestHandoffPath(brainRoot)
-    const teamSteps = readTeamBoardSteps(brainRoot)
-    const openBlockers = teamSteps.filter(step => step.status === 'blocked').length
 
     console.log('')
     console.log(`  Brain root: ${brainRoot}`)
-    if (latestHandoff) console.log(`  Latest handoff: ${latestHandoff}`)
-    console.log(`  Team blockers: ${openBlockers}`)
-    console.log('')
-    console.log('  Recommended next command:')
-    console.log(`  ${recommendation.command}`)
+    console.log(`  Recommended canonical command: ${recommendation.command}`)
     console.log(`  Reason: ${recommendation.reason}`)
     console.log('')
     return
@@ -2629,6 +2595,12 @@ async function main() {
       console.log(`  Initiative planned: ${initiativeMatch.id}`)
       console.log(`  Note: ${notePath}`)
       return
+    }
+
+    if (looksLegacyStep && stepArg) {
+      appendLegacyTelemetry(brainRoot, `brian plan ${stepArg}`, 'brian plan <initiative-id>')
+      console.log(`  Compatibility mode: legacy execution-plan step "${stepArg}"`)
+      console.log('  Canonical command: brian plan <initiative-id>')
     }
 
     const executionPlan = readExecutionPlanSteps(brainRoot)
@@ -2697,6 +2669,7 @@ async function main() {
       console.log('  Run `brian init` first.')
       return
     }
+    warnLegacyAlias(brainRoot, 'sprint')
 
     const executionPlan = readExecutionPlanSteps(brainRoot)
     if (!executionPlan || executionPlan.steps.length === 0) {
@@ -2745,6 +2718,7 @@ async function main() {
       console.log('  Run `brian init` first.')
       return
     }
+    warnLegacyAlias(brainRoot, command)
 
     const featureName = args.join(' ').trim()
     if (!featureName) {
@@ -2754,7 +2728,7 @@ async function main() {
 
     const packet = createSpecPacket(brainRoot, featureName)
     console.log(`  Spec packet ready: ${packet.dir}`)
-    console.log(`  Next: run \`brian mission "${featureName}"\` to append execution/team tracking.`)
+    console.log(`  Next: run \`brian propose "${featureName}"\` to continue in canonical lifecycle.`)
     return
   }
 
@@ -2765,6 +2739,7 @@ async function main() {
       console.log('  Run `brian init` first.')
       return
     }
+    warnLegacyAlias(brainRoot, 'mission')
 
     const featureName = args.join(' ').trim()
     if (!featureName) {
@@ -2791,6 +2766,7 @@ async function main() {
       console.log('  Run `brian init` first.')
       return
     }
+    warnLegacyAlias(brainRoot, 'sync')
 
     const files = findMarkdownFiles(brainRoot)
     const relativeFiles = files.map(file => path.relative(brainRoot, file))
@@ -2834,7 +2810,7 @@ async function main() {
       }
     }
     console.log('')
-    console.log('  Next in Codex: ask it to fix the issues found here, then run `brian sync` again.')
+    console.log('  Next in Codex: ask it to fix the issues found here, then run `brian doctrine-lint` again.')
     return
   }
 

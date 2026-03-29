@@ -28,7 +28,10 @@ export function useMcpTeam(brainId: string) {
       stage?: string
       kind?: 'info' | 'status' | 'blocker'
       initiativeId?: string
+      initiativeTitle?: string
       discussionId?: string
+      discussionTitle?: string
+      decisionQuestion?: string
       refs?: string[]
     }>
   >([])
@@ -43,6 +46,10 @@ export function useMcpTeam(brainId: string) {
       wsRef.current = ws
 
       ws.onopen = () => {
+        if (cancelled) {
+          try { ws.close() } catch {}
+          return
+        }
         reconnectAttemptsRef.current = 0
         setConnected(true)
       }
@@ -63,7 +70,6 @@ export function useMcpTeam(brainId: string) {
       }
       ws.onerror = () => {
         setConnected(false)
-        ws.close()
       }
       ws.onmessage = (event) => {
         try {
@@ -87,7 +93,10 @@ export function useMcpTeam(brainId: string) {
                 stage: typeof msg.stage === 'string' ? msg.stage : undefined,
                 kind: msg.kind === 'status' || msg.kind === 'blocker' ? msg.kind : 'info',
                 initiativeId: typeof msg.initiativeId === 'string' ? msg.initiativeId : undefined,
+                initiativeTitle: typeof msg.initiativeTitle === 'string' ? msg.initiativeTitle : undefined,
                 discussionId: typeof msg.discussionId === 'string' ? msg.discussionId : undefined,
+                discussionTitle: typeof msg.discussionTitle === 'string' ? msg.discussionTitle : undefined,
+                decisionQuestion: typeof msg.decisionQuestion === 'string' ? msg.decisionQuestion : undefined,
                 refs: Array.isArray(msg.refs) ? msg.refs.filter((r: unknown) => typeof r === 'string') as string[] : [],
               },
               ...prev,
@@ -111,7 +120,7 @@ export function useMcpTeam(brainId: string) {
       }
       pendingRef.current.clear()
       const ws = wsRef.current
-      if (ws) ws.close()
+      if (ws && ws.readyState === WebSocket.OPEN) ws.close()
       wsRef.current = null
     }
   }, [brainId])

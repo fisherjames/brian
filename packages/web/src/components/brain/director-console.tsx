@@ -219,7 +219,7 @@ export default function DirectorConsole({ brainId }: { brainId: string }) {
       <div className="mb-4 flex items-center justify-between rounded border border-border bg-white p-3">
         <div>
           <div className="text-[11px] uppercase tracking-wide text-text-muted">Director Briefing Console</div>
-          <div className="text-[12px] text-text-secondary">{'Intent -> Proposal -> Discussion -> Decision -> Shape -> Plan -> Execute'}</div>
+          <div className="text-[12px] text-text-secondary">{'Intent -> Proposal -> Discussion -> Decision -> Shape -> Plan -> Execute -> Verify -> Merge -> Brief'}</div>
         </div>
         <div className={`rounded px-2 py-1 text-[11px] ${connected ? 'bg-[#5B9A65]/10 text-[#5B9A65]' : 'bg-[#D95B5B]/10 text-[#D95B5B]'}`}>
           {connected ? 'MCP connected' : 'MCP offline'}
@@ -227,8 +227,8 @@ export default function DirectorConsole({ brainId }: { brainId: string }) {
       </div>
 
       <div className="mb-4 rounded border border-border bg-white p-3">
-        <div className="mb-1 text-[11px] uppercase tracking-wide text-text-muted">How To Use CEO Dashboard</div>
-        <div className="text-[12px] text-text-secondary">1) Capture or seed initiatives. 2) Approve decisions and resolve escalations. 3) Generate briefing and use Team Tracker for verification + merge.</div>
+        <div className="mb-1 text-[11px] uppercase tracking-wide text-text-muted">How To Use Directors</div>
+        <div className="text-[12px] text-text-secondary">1) Resolve decision inbox questions. 2) Resolve or escalate active discussions with explicit context. 3) Generate briefing for CEO visibility.</div>
       </div>
 
       <div className="mb-4 flex items-center justify-between rounded border border-border bg-white p-3">

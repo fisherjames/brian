@@ -2,7 +2,6 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getBrain, scanBrainFiles, parseBrainLinks, getExecutionSteps, getHandoffs } from '@/lib/local-data'
 import { BrainLayout } from '@/components/brain/brain-layout'
-import CompanyOS from '@/components/brain/company-os'
 
 async function getBrainData(brainId: string) {
   const brain = getBrain(brainId)
@@ -25,19 +24,15 @@ async function getBrainData(brainId: string) {
 
 export default async function BrainPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ brainId: string }>
-  searchParams: Promise<{ legacy?: string }>
 }) {
   const { brainId } = await params
-  const query = await searchParams
   const data = await getBrainData(brainId)
 
   if (!data) notFound()
 
   const { brain, files, links, executionSteps, handoffs } = data
-  const showLegacy = query.legacy === '1'
 
   return (
     <div className="bg-mesh grain flex h-full flex-col overflow-hidden">
@@ -52,31 +47,21 @@ export default async function BrainPage({
           <span className="truncate text-[13px] font-medium">{brain.name}</span>
         </div>
         <div className="flex items-center gap-2">
-          {showLegacy ? (
-            <Link href={`/brains/${brainId}`} className="rounded border border-border px-2 py-1 text-[11px] text-text-secondary hover:bg-text/5">
-              Company OS
-            </Link>
-          ) : (
-            <Link href={`/brains/${brainId}?legacy=1`} className="rounded border border-border px-2 py-1 text-[11px] text-text-secondary hover:bg-text/5">
-              Legacy Workspace
-            </Link>
-          )}
+          <Link href={`/brains/${brainId}?tab=mission`} className="rounded border border-border px-2 py-1 text-[11px] text-text-secondary hover:bg-text/5">
+            Open CEO Mission
+          </Link>
         </div>
       </nav>
 
-      {showLegacy ? (
-        <BrainLayout
-          brainId={brainId}
-          files={files}
-          links={links}
-          executionSteps={executionSteps}
-          handoffs={handoffs}
-          brainName={brain.name}
-          brainDescription={brain.description ?? ''}
-        />
-      ) : (
-        <CompanyOS brainId={brainId} brainName={brain.name} />
-      )}
+      <BrainLayout
+        brainId={brainId}
+        files={files}
+        links={links}
+        executionSteps={executionSteps}
+        handoffs={handoffs}
+        brainName={brain.name}
+        brainDescription={brain.description ?? ''}
+      />
     </div>
   )
 }

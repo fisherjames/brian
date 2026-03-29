@@ -23,6 +23,7 @@ export const V2_EVENT_TYPES = [
   'merge_attempted',
   'merge_blocked',
   'merge_completed',
+  'legacy_command_used',
   'briefing_generated',
   'briefing_published',
 ] as const
@@ -40,7 +41,10 @@ export type V2Event = {
   kind: V2EventType
   message: string
   initiativeId?: string
+  initiativeTitle?: string
   discussionId?: string
+  discussionTitle?: string
+  decisionQuestion?: string
   refs: string[]
 }
 
@@ -62,6 +66,15 @@ export type V2Discussion = {
   status: 'open' | 'resolved' | 'escalated'
   initiativeId?: string
   unresolvedQuestions: number
+  question: string
+  outcome: 'pending' | 'confirmed' | 'denied'
+  thread: string[]
+  latestResponse: string
+  openQuestions: string[]
+  outcomes: string[]
+  participants: string[]
+  escalationState: 'none' | 'pending' | 'resolved'
+  pausedByEscalation: boolean
   filePath: string
   updatedAt: string
 }
@@ -71,6 +84,11 @@ export type V2Decision = {
   title: string
   initiativeId?: string
   status: 'pending' | 'approved' | 'rejected'
+  question: string
+  mode: 'yes_no' | 'multi_option'
+  options: string[]
+  selectedOption?: string
+  outcome: 'pending' | 'confirmed' | 'denied'
   rationale: string
   filePath: string
   at: string
@@ -100,5 +118,6 @@ export type V2CompanyState = {
   pendingDecisions: V2Decision[]
   activeEscalations: V2Discussion[]
   executionActive: number
-  blockers: Array<{ code: string; message: string }>
+  blockers: Array<{ code: string; message: string; class: 'hard_blocker' }>
+  advisories: Array<{ code: string; message: string; class: 'advisory' }>
 }

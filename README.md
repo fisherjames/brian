@@ -4,10 +4,165 @@
   <img src="packages/web/public/logo.svg" alt="Brian" width="180" />
 </p>
 
-Brian is a fully managed Codex-first project memory system: a viewer, a repo scaffold, a role/employee model, a Codex skill pack, and a small CLI that keeps real project context inside the repository.
+Brian is a markdown-first AI operating system for running software delivery like a visible company.
 
-## Default Layout
+## Vision
+Brian should feel like a company that thinks in markdown.
 
+Core intent:
+- Strategy, discussion, decisions, and execution are visible.
+- Human approvals happen at explicit gates.
+- Delivery state is auditable in repo notes and local event logs.
+- CEO can steer work from the viewer without digging through raw agent noise.
+
+## Philosophy
+Brian V2 operates on these non-negotiable rules:
+- `intent -> proposal -> leadership discussion -> director decision -> tribe shaping -> squad planning -> execution -> verification -> merge -> briefing`
+- No execution without context.
+- No unresolved discussion without escalation.
+- Every meaningful interaction emits one of: `answer | decision | task | risk | escalation`.
+- Merge requires verification evidence.
+
+## Current Product Surfaces
+- `CEO Mission` (executive control):
+  - initiatives, decisions, briefings, blockers only (noise-free CEO view)
+- `Directors`:
+  - decision inbox + escalation context and resolution actions
+- `Tribe` (cross-initiative direction):
+  - shaping, prioritization, and escalation routing between squad and directors
+- `Mission Control` (squad-level orchestration):
+  - current task, queue, blockers, live output
+  - verification gate
+  - worktree queue, preview, merge actions
+- `Agents + Workflow`:
+  - agent markdown editor by persona
+  - editable Codex skill files (`~/.codex/skills/*/SKILL.md`)
+  - editable Brian workflow rules (`brian/org/rules.md`)
+- `Graph + Notes`:
+  - graph navigation + markdown notes with clickable records from CEO and Directors views
+
+## Storage Model
+- Repo-visible memory: `brian/`
+- Repo-local metadata: `.brian/brain.json`
+- Global registry/runtime config: `~/.brian/brains.json`, `~/.brian/server.json`
+- Runtime event log: `~/.brian/state/<brainId>/events.ndjson`
+
+## Key Features (Implemented)
+- V2 lifecycle APIs under `/api/v2/brains/:id/*`.
+- MCP-backed viewer actions (`/ws` team channel) for mission operations.
+- Explicit question/outcome model for decisions/escalations (`confirmed`/`denied`).
+- Dynamic Agent Lab:
+  - `lab.catalog.search`
+  - `lab.assignment.set`
+  - `lab.assignment.clear`
+  - scored catalog signals (stars + freshness + query hits)
+  - assignment state in `brian/org/agent-lab.md`
+- Execution-policy enforcement on `initiative.execute`:
+  - assignment-aware actor routing
+  - policy metadata persisted in initiative notes (`Execution Policy` section + frontmatter fields)
+- Plan rework from CEO tab:
+  - `workflow.update_plan` appends structured `CEO Plan Rework` entries to `brian/execution-plan.md`.
+- Guided initiative objective defaults from next open execution-plan step.
+- Safe autopilot lifecycle:
+  - `workflow.autopilot.start | state | stop`
+  - governance-safe blocking when unresolved decisions/escalations exist.
+
+## Vision vs Reality (Delta)
+This section is the explicit gap tracker between intended product and current build.
+
+What matches vision now:
+- Markdown remains source of truth for company memory.
+- Decisions/escalations are explicit and actionable.
+- CEO/Tribe/Squad split exists in UI.
+- Human verification and merge gating are modeled in Mission Control.
+
+Where we are still short:
+- Full unattended overnight delivery is still intentionally constrained by governance gates; human steering/verification remains required before merge.
+
+## Getting Started
+
+### 1) Install
+```bash
+git clone <your-fork-or-origin-url>
+cd brian
+npm install
+npm run build
+npm run install:cli
+```
+
+### 2) Start Viewer
+```bash
+brian --port 3010
+```
+Open:
+- `http://localhost:3010/brains`
+
+### 3) Initialize or Register a Brain
+Inside a target repo:
+```bash
+brian init
+brian status
+```
+
+### 4) Run the V2 Lifecycle
+```bash
+brian intent "Improve activation for new users"
+brian propose "Activation improvement initiative"
+brian shape <initiative-id>
+brian plan <initiative-id>
+brian work
+brian brief
+brian decide <initiative-id> "Approve rollout"
+```
+
+### 5) Use Viewer Mission Tabs
+- `CEO Mission`: monitor initiatives, decisions, briefings, blockers.
+- `Directors`: approve/deny decisions and resolve escalations with explicit context.
+- `Tribe`: resolve and escalate questions across squad, tribe, and director.
+- `Mission Control`: execute queue, verify, merge safely.
+- `Agents + Workflow`: edit agents, skills, and rules in one place.
+- `Graph + Notes`: inspect linked initiative/discussion/decision/briefing records.
+
+### 6) Experiment with Agent Lab
+In `CEO Mission`:
+- choose `skill`, `rule`, or `soul`
+- search popular repos
+- assign to a specialist
+- track assignments in `brian/org/agent-lab.md`
+
+## CLI Commands (Practical Set)
+- `brian` start viewer
+- `brian init` scaffold/register workspace
+- `brian status` list active/registered brains
+- `brian intent <text>` capture intent
+- `brian propose <title>` create proposal-stage initiative
+- `brian shape <initiative-id>` move to tribe shaping
+- `brian plan <initiative-id>` move to squad planning
+- `brian work` run implementation loop
+- `brian brief` generate briefing
+- `brian decide <initiative-id> <title>` record director decision
+- `brian end` wrap the current session with handoff update
+- `brian doctrine-lint` validate workflow integrity
+
+Compatibility aliases still exist for migration, but canonical commands above are the only promoted workflow.
+
+## Single-Page Operating Model
+Use this as the day-to-day contract:
+- `CEO Mission`: decide priorities and clear blockers that require executive intent.
+- `Directors`: resolve pending decisions/escalations with explicit question context.
+- `Tribe`: shape initiative direction and escalate only unresolved cross-cutting questions.
+- `Mission Control`: run one queue item at a time, record verification, then merge worktree.
+- `Graph + Notes`: inspect evidence and rationale records.
+- `Agents + Workflow`: tune personas, skills, and rules when output quality drops.
+
+Definition of done per initiative:
+- Discussion question resolved or escalated with record.
+- Decision recorded and resolved.
+- Verification captured before merge.
+- Worktree merged conflict-free.
+- Briefing generated with rationale and status.
+
+## Repository Layout
 ```text
 repo/
 ├── AGENTS.md
@@ -16,8 +171,6 @@ repo/
 └── brian/
     ├── index.md
     ├── execution-plan.md
-    ├── constitution.md
-    ├── specs/
     ├── product/
     ├── engineering/
     ├── operations/
@@ -29,172 +182,34 @@ repo/
     ├── decisions/
     ├── briefings/
     ├── tasks/
-    ├── handoffs/
-    ├── templates/
-    └── assets/
+    └── handoffs/
 ```
 
-## Install
+## Verification Checklist
+Use this to assess whether reality matches expectations after pull/build:
+- Viewer loads `/brains` and a brain detail page.
+- CEO Mission shows pending decision/escalation cards with explicit questions.
+- `Update Plan` writes to `brian/execution-plan.md`.
+- Mission Control shows actionable queue/blockers/worktrees.
+- Tribe tab can respond/confirm/deny/escalate questions across squad/tribe/director.
+- Agents + Workflow can edit real Codex skills and Brian rules.
 
-```bash
-git clone <your fork url>
-cd <your fork directory>
-npm install
-npm run build
-npm run install:cli
-```
+## Release Readiness Scorecard
+Use this before shipping. Mark each item `Pass` or `Fail`.
 
-That installs the `brian` command globally.
-
-## Quick Start
-
-1. Start the viewer:
-
-```bash
-brian --port 3010
-```
-
-2. In an existing repo:
-
-```bash
-cd /path/to/project
-brian init
-```
-
-3. Run the canonical V2 lifecycle:
-
-```bash
-brian intent "Improve onboarding conversion"
-brian propose "Onboarding conversion initiative"
-brian shape initiative-xxxx
-brian plan initiative-xxxx
-brian work
-brian brief
-brian decide initiative-xxxx "Approve rollout to 25%"
-```
-
-4. Compatibility flow for legacy execution-plan/team-board:
-
-```bash
-brian mission "Feature Name"
-```
-
-5. End a managed Codex session:
-
-```bash
-brian end
-```
-
-## Managed Experience
-
-`brian init --preset codex-team` now handles more than note scaffolding:
-
-- creates the Brian note structure
-- installs a managed Codex skill pack into `~/.codex/skills/`
-- scaffolds role notes under `brian/agents/`
-- scaffolds command loops under `brian/commands/`
-- can add `package.json` helper scripts
-- links existing markdown docs into `brian/operations/existing-docs.md`
-
-The installed skill pack includes:
-
-- `brian-core`
-- `brian-founder-ceo`
-- `brian-product-lead`
-- `brian-growth-marketing`
-- `brian-frontend-engineer`
-- `brian-backend-engineer`
-- `brian-mobile-engineer`
-- `brian-devops-release`
-- `brian-team-orchestrator`
-
-## Commands
-
-- `brian` starts the viewer
-- `brian intent "<text>"` captures initiative intent (V2)
-- `brian propose "<name>"` creates proposal-stage initiative (V2)
-- `brian shape <initiative-id>` moves initiative to shaping stage (V2)
-- `brian plan <initiative-id>` plans initiative execution (V2)
-- `brian brief` generates a director briefing (V2)
-- `brian decide <initiative-id> "<title>"` records a director decision (V2)
-- `brian doctrine-lint` validates governance and pipeline hygiene (V2)
-- `brian next` shows one recommended next command
-- `brian work [--role <role>]` launches Codex with the managed start prompt
-- `brian end [--role <role>]` creates the handoff and launches the managed wrap-up prompt
-- `brian status` shows the active brain or all registered brains
-- `brian mission "<name>"` creates spec packet + execution/team entries
-- `brian init` scaffolds a Brian workspace
-- `brian resume` prints the canonical files to read
-- `brian wrap-up` creates the next handoff template
-- `brian notes "<scope>"` reconciles downstream notes after top-level edits
-- `brian migrate` converts an old layout into `brian/` + `.brian/`
-- `brian plan [step]` is V2-first; use `EP-*` ids for legacy execution-plan step notes
-- `brian sprint` creates a sprint note from ready/in-progress work
-- `brian sync` audits links and parent relationships
-- `brian spec "<name>"` creates a feature spec packet
-- `brian feature "<name>"` aliases to `brian spec`
-- `brian codex` prints the Codex/Brian split
-
-## Workflow Philosophy
-
-Brian V2 is initiative-first and decision-first (with spec-kit style discipline):
-
-- start from intent and proposal, not a flat task list
-- use discussion and decision records as visible reasoning
-- derive execution tasks only after shaping/planning
-- keep implementation and operational memory in-repo and link-valid
-
-## V2 Viewer Flag
-
-V2 Director Console is currently parallelized behind a feature flag:
-
-- set `NEXT_PUBLIC_BRIAN_V2=1` before starting the viewer
-- or open a brain with `?v2=1`
-- Director Console supports:
-  - Playback Mode (`Run Slow / Run Normal / Run Fast`) for staged lifecycle simulation
-  - Backlog seeding (`Seed 3-Pack`) for incremental + dream + refactor initiative generation
-  - In-console escalation and decision resolution (`Mark Resolved`, `Approve`, bulk actions)
-
-V1 remains runnable during migration.
-
-## Parallel Work
-
-Brian supports parallel work as a managed pattern, not as fake native subagents.
-
-The safe pattern is:
-
-1. decompose work into explicit tasks with owners, paths, dependencies, verification, and merge order
-2. mirror that state into `brian/commands/team-board.md`
-3. keep each worker isolated in its own branch or worktree
-4. review before merge
-5. merge in dependency order
-6. end with a handoff and execution-plan update
-
-What Brian helps with:
-
-- role-scoped startup context
-- shared task board in the viewer
-- explicit ownership and merge ordering in repo notes
-- durable handoffs and execution-plan state
-
-What Brian does not eliminate:
-
-- merge conflicts when two tasks still touch the same files
-- contract drift when tasks change shared interfaces without an explicit dependency edge
-- bad task splitting
-
-The fix is not hidden automation. The fix is better planning:
-
-- assign file/path ownership up front
-- call out shared contracts explicitly
-- mark task dependencies before coding
-- merge high-risk branches earlier
-
-## Important Limitation
-
-Codex skills improve behavior and specialization. They do not inject a prompt into an already-open live Codex thread. Brian therefore uses explicit session commands instead of pretending there is a hidden hook or live-session transport.
+| Area | Gate | Pass Criteria | Status |
+|---|---|---|---|
+| Viewer Runtime | App availability | `/brains` and `/brains/:id` load without module/chunk errors | ⬜ |
+| CEO Mission | Decision quality | Every pending decision/escalation shows an explicit question; confirm/deny works | ⬜ |
+| CEO Mission | Plan control | `Update Plan` appends a valid `CEO Plan Rework` section to `brian/execution-plan.md` | ⬜ |
+| Tribe | Governance flow | Escalations can be responded/confirmed/denied/escalated with explicit context | ⬜ |
+| Mission Control | Execution flow | Start next work, queue movement, blockers, and current task update correctly | ⬜ |
+| Mission Control | Merge safety | Merge action blocked until verification and conflict-free state; dry-run reflects reality | ⬜ |
+| Agents + Workflow | Skill/rule editing | Skill edits persist to `~/.codex/skills/*/SKILL.md`; rules persist to `brian/org/rules.md` | ⬜ |
+| Data Integrity | Notes + links | V2 notes are present, no placeholder sections, key wikilinks resolve | ⬜ |
+| Build Health | Compile + types | `npm run -s typecheck` and `npm run -s build` both succeed | ⬜ |
+| Delivery Evidence | Change validation | UI-impacting changes include before/after image references when feasible | ⬜ |
 
 ## Docs
-
 - [Getting started](docs/getting-started.md)
 - [Codex workflow](docs/codex.md)

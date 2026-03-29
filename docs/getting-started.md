@@ -56,13 +56,6 @@ brian decide initiative-xxxx "Approve rollout"
 
 This drives the canonical initiative lifecycle.
 
-Legacy compatibility still exists:
-
-```bash
-brian next
-brian mission "Feature Name"
-```
-
 Or launch with a role directly:
 
 ```bash
@@ -79,41 +72,46 @@ This launches Codex with:
 - the latest handoff
 - the relevant role note
 
-## 5. Use Company OS (V2 Default)
+## 5. Use V2 Dashboard Tabs
 
 Open:
 
 - `http://localhost:3010/brains/<brainId>`
 
-In Company OS:
+In V2 tabs:
 
-- use `Capture Intent` for one initiative
-- use `Seed 3-Pack` for incremental + dream + refactor backlog generation
-- resolve escalations and decisions in the CEO inbox (`Resolve All Escalations`, `Approve All`)
-- use `Tick` and `Generate Briefing` to drive and summarize lifecycle progress
-- legacy graph/files workspace remains available at `?legacy=1`
+- `CEO Mission`:
+  - initiatives, decisions, briefings, blockers only
+  - use `Start Guided Initiative` for one objective
+  - use `Update Plan` to append CEO plan rework into `brian/execution-plan.md`
+- `Directors`:
+  - resolve pending decisions and escalations with explicit context
+  - confirm that yes/no or option-based decisions are answered clearly
+- `Tribe`:
+  - resolve squad, tribe, and director questions in one place
+  - escalate through org layers up to CEO decisions
+  - advance lifecycle staging when shaping is ready
+- `Mission Control`:
+  - run execution queue, review blockers, verify, and merge safely
+  - use `Generate Handoff` to write an explicit handoff checkpoint any time
+- `Agents + Workflow`:
+  - edit real Codex skill files under `~/.codex/skills/*/SKILL.md`
+  - edit agent markdown by persona
+  - edit shared rules markdown in one place
 
-In Team Tracker:
+In Mission Control:
 
 - `Start Next Work` marks the selected `NEXT:` item and auto-creates a paired `MERGE:` queue item with branch/image/breaking metadata.
 - `Dry Run Queue` validates merge metadata, verification status, and conflict risk before any merge.
 - every run completion writes a new handoff in `brian/handoffs/` and pushes it to the live Handoffs panel.
 - `Start Observer` auto-seeds a 3-pack backlog (`incremental`, `dream_feature`, `refactor`) when queue is empty.
 
-## 6. Start A Spec-First Feature (Compatibility)
+Workflow contract in practice:
+- `intent -> proposal -> leadership discussion -> director decision -> tribe shaping -> squad planning -> execution -> verification -> merge -> briefing`
+- `hard_blocker` halts progression.
+- `advisory` is visible but does not halt progression.
 
-```bash
-brian mission "Feature Name"
-```
-
-This creates:
-
-- `brian/specs/spec-<feature>/index.md`
-- `spec.md`, `plan.md`, `tasks.md`, `review.md`
-- a linked execution-plan step
-- a linked team-board step
-
-## 7. End Work
+## 6. End Work
 
 ```bash
 brian end
@@ -127,7 +125,7 @@ brian end --role backend
 
 This creates the next handoff and launches Codex with the managed wrap-up prompt.
 
-## 8. Migrate An Older Repo
+## 7. Migrate An Older Repo
 
 If a repo still has an older layout:
 
@@ -137,7 +135,7 @@ brian migrate
 
 After migration, Brian operates on `brian/` plus `.brian/`.
 
-## 9. Team And Parallel Work
+## 8. Team And Parallel Work
 
 For multi-role work:
 
@@ -148,3 +146,7 @@ For multi-role work:
 - keep each worker in its own branch or worktree
 
 Brian improves coordination and visibility. It does not remove the need for good task boundaries.
+
+Compatibility notes:
+- Legacy commands still run as aliases during migration.
+- Canonical command set is: `intent`, `propose`, `shape`, `plan`, `work`, `brief`, `decide`, `status`, `doctrine-lint`.
