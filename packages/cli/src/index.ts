@@ -1617,7 +1617,7 @@ Codex-specific operating notes live here.
 
 ## Key Files
 - [[project-operator]]
-${hasCommands ? '- [[founder-ceo]]\n- [[product-lead]]\n- [[growth-marketing]]\n- [[frontend-engineer]]\n- [[backend-engineer]]\n- [[mobile-engineer]]\n- [[devops-release]]\n' : ''}`)
+${hasCommands ? '- [[founder-ceo]]\n- [[director]]\n- [[tribe-head]]\n- [[product-lead]]\n- [[growth-marketing]]\n- [[frontend-engineer]]\n- [[backend-engineer]]\n- [[mobile-engineer]]\n- [[devops-release]]\n' : ''}`)
 
   writeFileIfMissing(path.join(docsRoot, 'agents', 'project-operator.md'), `# project operator
 
@@ -1636,6 +1636,8 @@ Use this agent note for routine implementation work in Codex.
   if (hasCommands) {
     const roleNotes: Array<[string, string, string]> = [
       ['founder-ceo.md', 'founder / ceo', 'Use this note when shaping direction, priorities, positioning, or business tradeoffs. Keep the output high-level, explicit about tradeoffs, and tied back to the actual product constraints.'],
+      ['director.md', 'director', 'Use this note for director-level decisions and escalation handling. Convert ambiguity into explicit yes/no or option-based decisions with concise rationale.'],
+      ['tribe-head.md', 'tribe head', 'Use this note for tribe-level shaping and cross-squad escalation triage. Resolve what can be resolved locally, escalate only unresolved cross-cutting risks.'],
       ['product-lead.md', 'product lead', 'Use this note for scope shaping, requirement clarity, rollout planning, and user-facing tradeoffs. Convert vague ideas into concrete acceptance criteria before coding starts.'],
       ['growth-marketing.md', 'growth / marketing', 'Use this note for messaging, landing pages, funnels, lifecycle copy, or launch planning. Keep claims honest and tie messaging to the real product behavior.'],
       ['frontend-engineer.md', 'frontend engineer', 'Use this note for web UI, design systems, rendering behavior, and browser-facing user flows. Preserve existing UX patterns unless the product direction clearly changed.'],

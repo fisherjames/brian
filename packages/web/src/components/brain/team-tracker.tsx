@@ -270,6 +270,8 @@ export default function TeamTracker({
       'mobile-engineer',
       'devops-release',
       'founder-ceo',
+      'director',
+      'tribe-head',
     ])
     return events.filter((event) => event.actor && allowed.has(event.actor))
   }, [events])

@@ -108,6 +108,20 @@ type PersonaIdentity = {
 }
 
 const PERSONA_IDENTITY: Record<string, PersonaIdentity> = {
+  director: {
+    id: 'director',
+    name: 'Director',
+    role: 'Director',
+    voice: 'strategic and structured',
+    concern: 'Tradeoff clarity and decision quality',
+  },
+  'tribe-head': {
+    id: 'tribe-head',
+    name: 'Tribe Head',
+    role: 'Tribe Head',
+    voice: 'cross-functional and pragmatic',
+    concern: 'Scope, sequencing, and escalations',
+  },
   'founder-ceo': {
     id: 'founder-ceo',
     name: 'James',
@@ -581,11 +595,12 @@ function writeAutopilotState(brainId: string, state: AutopilotState) {
 
 function listSpecialists(brainPath: string): string[] {
   const dir = path.join(brainPath, 'brian', 'agents')
-  if (!fs.existsSync(dir)) return ['project-operator']
-  return fs.readdirSync(dir)
+  if (!fs.existsSync(dir)) return ['project-operator', 'director', 'tribe-head']
+  const discovered = fs.readdirSync(dir)
     .filter((file) => file.endsWith('.md') && file !== 'agents.md')
     .map((file) => file.replace(/\.md$/, ''))
-    .sort()
+  const base = new Set([...discovered, 'director', 'tribe-head'])
+  return [...base].sort()
 }
 
 function defaultCatalogQuery(kind: LabKind): string {

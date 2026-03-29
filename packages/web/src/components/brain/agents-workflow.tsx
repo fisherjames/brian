@@ -85,7 +85,8 @@ export default function AgentsWorkflow({ brainId }: { brainId: string }) {
     const load = async () => {
       if (!connected) return
       const lab = await call<LabStateResult>('lab.state.get', {})
-      const nextSpecialists = Array.isArray(lab.result?.specialists) ? lab.result?.specialists : []
+      const discovered = Array.isArray(lab.result?.specialists) ? lab.result?.specialists : []
+      const nextSpecialists = [...new Set([...discovered, 'director', 'tribe-head'])].sort()
       if (cancelled) return
       setSpecialists(nextSpecialists)
       if (!selectedAgent && nextSpecialists.length > 0) {

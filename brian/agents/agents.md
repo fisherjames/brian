@@ -4,6 +4,8 @@
 
 ## Core Personas
 - [[founder-ceo]]
+- [[director]]
+- [[tribe-head]]
 - [[product-lead]]
 - [[frontend-engineer]]
 - [[backend-engineer]]
