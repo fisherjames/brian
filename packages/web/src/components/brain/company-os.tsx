@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useMcpTeam } from '@/hooks/use-mcp-team'
+import Link from 'next/link'
 
 type CompanyState = {
   brainId: string
@@ -21,6 +22,14 @@ type CompanyState = {
   blockers: Array<{ code: string; message: string }>
 }
 
+type Briefing = {
+  id: string
+  title: string
+  summary: string
+  published: boolean
+  at: string
+}
+
 function stageLabel(stage: string) {
   return stage.replace(/_/g, ' ')
 }
@@ -34,13 +43,21 @@ export default function CompanyOS({
 }) {
   const { call, connected, events } = useMcpTeam(brainId)
   const [state, setState] = useState<CompanyState | null>(null)
+  const [briefings, setBriefings] = useState<Briefing[]>([])
   const [intent, setIntent] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState('')
 
   const refresh = useCallback(async () => {
-    const company = await fetch(`/api/v2/brains/${brainId}/company-state`, { cache: 'no-store' })
+    const [company, briefingsRes] = await Promise.all([
+      fetch(`/api/v2/brains/${brainId}/company-state`, { cache: 'no-store' }),
+      fetch(`/api/v2/brains/${brainId}/director-briefings`, { cache: 'no-store' }),
+    ])
     if (company.ok) setState((await company.json()) as CompanyState)
+    if (briefingsRes.ok) {
+      const data = (await briefingsRes.json()) as { briefings?: Briefing[] }
+      setBriefings(Array.isArray(data.briefings) ? data.briefings : [])
+    }
   }, [brainId])
 
   useEffect(() => {
@@ -87,6 +104,25 @@ export default function CompanyOS({
         <div className="mt-2 text-[12px] text-text-muted">
           Use this as CEO control. Legacy graph/files UI is still available at <code>?legacy=1</code>.
         </div>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <Link href={`/brains/${brainId}?legacy=1&tab=graph`} className="rounded border border-border px-2 py-1 text-[12px] text-text-secondary hover:bg-text/5">
+            Open Graph
+          </Link>
+          <Link href={`/brains/${brainId}?legacy=1`} className="rounded border border-border px-2 py-1 text-[12px] text-text-secondary hover:bg-text/5">
+            Open Notes / Files
+          </Link>
+        </div>
+      </div>
+
+      <div className="mb-4 rounded border border-border bg-white p-3">
+        <div className="mb-1 text-[11px] uppercase tracking-wide text-text-muted">Feature Callout + Instructions</div>
+        <div className="text-[12px] text-text-secondary">
+          Feature: CEO can progress initiatives through explicit governance gates with visible persona discussion and decision records.
+        </div>
+        <div className="mt-1 text-[12px] text-text-secondary">
+          Instruction: use <strong>Tick</strong> to move one active initiative exactly one stage forward in the canonical lifecycle.
+          Tick does not skip gates; use approvals/escalation resolution before ticking when needed.
+        </div>
       </div>
 
       <div className="mb-4 grid gap-3 md:grid-cols-2">
@@ -109,7 +145,7 @@ export default function CompanyOS({
           </div>
           <div className="mt-2 flex flex-wrap gap-2">
             <button onClick={() => void run('workflow.seed_backlog', { theme: 'company os', actor: 'founder-ceo' }, 'seed')} disabled={busy === 'seed'} className="rounded border border-border px-2 py-1.5 text-[12px] disabled:opacity-50">Seed Backlog</button>
-            <button onClick={() => void run('workflow.tick', {}, 'tick')} disabled={busy === 'tick'} className="rounded border border-border px-2 py-1.5 text-[12px] disabled:opacity-50">Tick</button>
+            <button onClick={() => void run('workflow.tick', {}, 'tick')} disabled={busy === 'tick'} className="rounded border border-border px-2 py-1.5 text-[12px] disabled:opacity-50">Tick (Advance 1 Stage)</button>
             <button onClick={() => void run('briefing.generate', { actor: 'founder-ceo' }, 'brief')} disabled={busy === 'brief'} className="rounded border border-border px-2 py-1.5 text-[12px] disabled:opacity-50">Generate Briefing</button>
           </div>
         </div>
@@ -189,6 +225,23 @@ export default function CompanyOS({
             ))
           )}
         </div>
+      </div>
+
+      <div className="mb-4 rounded border border-border bg-white p-3">
+        <div className="mb-2 text-[11px] uppercase tracking-wide text-text-muted">Director Briefings</div>
+        {briefings.length === 0 ? (
+          <div className="text-[12px] text-text-muted">No briefings yet. Use Generate Briefing after key transitions.</div>
+        ) : (
+          <div className="max-h-[220px] space-y-2 overflow-y-auto">
+            {briefings.slice(0, 12).map((briefing) => (
+              <div key={briefing.id} className="rounded border border-border/70 p-2">
+                <div className="text-[12px] font-medium">{briefing.title}</div>
+                <div className="text-[11px] text-text-muted">{new Date(briefing.at).toLocaleString('en-GB')}</div>
+                <div className="mt-1 text-[12px] text-text-secondary">{briefing.summary}</div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="rounded border border-border bg-white p-3">

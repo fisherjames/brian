@@ -77,6 +77,13 @@ export function BrainLayout({
 
   const [activeTabId, setActiveTabId] = useState('director');
   const [tabs, setTabs] = useState<Tab[]>([GRAPH_TAB, TEAM_TAB, DIRECTOR_TAB]);
+  useEffect(() => {
+    const requestedTab = new URLSearchParams(window.location.search).get('tab')
+    if (!requestedTab) return
+    if (requestedTab === 'graph' || requestedTab === 'team' || requestedTab === 'director') {
+      setActiveTabId(requestedTab)
+    }
+  }, [])
   const [fileContents, setFileContents] = useState<Map<string, string>>(new Map());
   const [loadingFile, setLoadingFile] = useState<string | null>(null);
 
