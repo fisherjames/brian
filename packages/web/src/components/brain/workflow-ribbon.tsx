@@ -43,6 +43,7 @@ function nextActionForTab(tabId: string): string {
 
 export default function WorkflowRibbon({ brainId, activeTabId }: { brainId: string; activeTabId: string }) {
   const [state, setState] = useState<CompanyState | null>(null)
+  const [isMobile, setIsMobile] = useState(false)
 
   const refresh = useCallback(async () => {
     const res = await fetch(`/api/v2/brains/${brainId}/company-state`, { cache: 'no-store' })
@@ -57,6 +58,13 @@ export default function WorkflowRibbon({ brainId, activeTabId }: { brainId: stri
     }, 5000)
     return () => clearInterval(id)
   }, [refresh])
+
+  useEffect(() => {
+    const sync = () => setIsMobile(window.innerWidth < 768)
+    sync()
+    window.addEventListener('resize', sync)
+    return () => window.removeEventListener('resize', sync)
+  }, [])
 
   const currentStage = deriveCurrentStage(state)
   const currentIndex = stageIndex(currentStage)
@@ -74,26 +82,34 @@ export default function WorkflowRibbon({ brainId, activeTabId }: { brainId: stri
         <div className="uppercase tracking-wide text-text-muted">Workflow Contract</div>
         <div className="text-text-secondary">{summary}</div>
       </div>
-      <div className="mb-2 flex flex-wrap items-center gap-2">
-        {STAGES.map((stage, idx) => {
-          const complete = idx < currentIndex
-          const active = idx === currentIndex
-          return (
-            <div
-              key={stage.id}
-              className={`rounded border px-2 py-1 text-[11px] ${
-                complete
-                  ? 'border-[#5B9A65]/40 bg-[#5B9A65]/10 text-[#2f6638]'
-                  : active
-                    ? 'border-[#4A9FD9]/40 bg-[#4A9FD9]/10 text-[#2a6d96]'
-                    : 'border-border bg-white text-text-muted'
-              }`}
-            >
-              {stage.label}
-            </div>
-          )
-        })}
-      </div>
+      {isMobile ? (
+        <div className="mb-2">
+          <div className="inline-flex rounded border border-[#4A9FD9]/40 bg-[#4A9FD9]/10 px-2 py-1 text-[11px] text-[#2a6d96]">
+            Stage: {STAGES[currentIndex]?.label ?? 'Intent'}
+          </div>
+        </div>
+      ) : (
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          {STAGES.map((stage, idx) => {
+            const complete = idx < currentIndex
+            const active = idx === currentIndex
+            return (
+              <div
+                key={stage.id}
+                className={`rounded border px-2 py-1 text-[11px] ${
+                  complete
+                    ? 'border-[#5B9A65]/40 bg-[#5B9A65]/10 text-[#2f6638]'
+                    : active
+                      ? 'border-[#4A9FD9]/40 bg-[#4A9FD9]/10 text-[#2a6d96]'
+                      : 'border-border bg-white text-text-muted'
+                }`}
+              >
+                {stage.label}
+              </div>
+            )
+          })}
+        </div>
+      )}
       <div className="text-[12px] text-text-secondary">
         Now in <span className="font-medium text-text">{STAGES[currentIndex]?.label ?? 'Intent'}</span>. {nextActionForTab(activeTabId)}
       </div>

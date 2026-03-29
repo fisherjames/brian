@@ -77,9 +77,20 @@ export function BrainLayout({
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
-    const mobile = window.innerWidth < 768;
-    setIsMobile(mobile);
-    if (mobile) setSidebarOpen(false);
+    const syncViewport = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (mobile) {
+        setSidebarOpen(false);
+        setRightPaneOpen(false);
+        setRightPaneCollapsed(true);
+      } else {
+        setRightPaneCollapsed(false);
+      }
+    };
+    syncViewport();
+    window.addEventListener('resize', syncViewport);
+    return () => window.removeEventListener('resize', syncViewport);
   }, []);
 
   const [activeTabId, setActiveTabId] = useState('mission');
@@ -98,6 +109,12 @@ export function BrainLayout({
       setActiveTabId(requestedTab)
     }
   }, [])
+
+  useEffect(() => {
+    if (!isMobile) return;
+    setSidebarOpen(false);
+    setRightPaneOpen(false);
+  }, [activeTabId, isMobile]);
   const [fileContents, setFileContents] = useState<Map<string, string>>(new Map());
   const [loadingFile, setLoadingFile] = useState<string | null>(null);
 
@@ -220,7 +237,39 @@ export function BrainLayout({
       )}
 
       <main className="flex flex-1 flex-col overflow-hidden">
-        <TabBar tabs={tabs} activeTabId={activeTabId} onSelectTab={setActiveTabId} onCloseTab={handleCloseTab} onCloseOthers={handleCloseOthers} onCloseToRight={handleCloseToRight} />
+        {isMobile ? (
+          <div className="flex items-center gap-2 border-b border-border bg-bg/85 px-3 py-2">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="rounded-md border border-border px-2 py-1 text-[12px] font-medium text-text-secondary hover:bg-text/5"
+            >
+              Files
+            </button>
+            <label htmlFor="mobile-tab-select" className="sr-only">
+              Select tab
+            </label>
+            <select
+              id="mobile-tab-select"
+              value={activeTabId}
+              onChange={(event) => setActiveTabId(event.target.value)}
+              className="min-w-0 flex-1 rounded-md border border-border bg-white px-2 py-1.5 text-[12px] text-text"
+            >
+              {tabs.map((tab) => (
+                <option key={tab.id} value={tab.id}>
+                  {tab.label}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={() => setRightPaneOpen(true)}
+              className="rounded-md border border-border px-2 py-1 text-[12px] font-medium text-text-secondary hover:bg-text/5"
+            >
+              Plan
+            </button>
+          </div>
+        ) : (
+          <TabBar tabs={tabs} activeTabId={activeTabId} onSelectTab={setActiveTabId} onCloseTab={handleCloseTab} onCloseOthers={handleCloseOthers} onCloseToRight={handleCloseToRight} />
+        )}
         <WorkflowRibbon brainId={brainId} activeTabId={activeTabId} />
 
         <div className="relative flex-1 overflow-y-auto">
@@ -273,7 +322,7 @@ export function BrainLayout({
         {rightPaneOpen ? <PanelRightClose className="h-4 w-4 text-leaf" /> : <PanelRightOpen className="h-4 w-4 text-text-muted" />}
       </button>
 
-      <div className={`${rightPaneOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'} fixed right-0 top-0 z-30 h-full transition-all duration-200 lg:relative lg:z-auto lg:h-auto ${rightPaneCollapsed ? 'lg:w-auto' : 'w-[280px]'}`}>
+      <div className={`${rightPaneOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'} fixed right-0 top-0 z-30 h-full transition-all duration-200 lg:relative lg:z-auto lg:h-auto ${rightPaneCollapsed ? 'lg:w-auto' : 'w-[92vw] max-w-[360px] lg:w-[280px] lg:max-w-none'}`}>
         <RightPane executionSteps={executionSteps} handoffs={handoffs} onToggleStep={handleToggleStep}
           onSelectHandoff={(id, path) => { handleSelectHandoff(id, path); setRightPaneOpen(false); }}
           collapsed={rightPaneCollapsed} onToggleCollapsed={() => setRightPaneCollapsed((c) => !c)} />
