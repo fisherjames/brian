@@ -145,10 +145,12 @@ export function buildCompanyState(brainId: string, brainPath: string): V2Company
 
 export function readV2Models(brainId: string, brainPath: string) {
   const companyState = buildCompanyState(brainId, brainPath)
+  const decisions = loadDecisions(brainPath)
   return {
     companyState,
     briefings: loadBriefings(brainPath),
     initiatives: companyState.initiatives,
     discussions: loadDiscussions(brainPath),
+    decisions,
   }
 }

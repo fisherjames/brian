@@ -22,6 +22,7 @@ export const V2_METHODS = new Set([
   'briefing.publish',
   'workflow.tick',
   'workflow.seed_backlog',
+  'workflow.watch_ping',
   'workflow.autopilot.state',
 ])
 
@@ -464,6 +465,24 @@ export function runV2McpCall(brainId: string, method: string, params: Record<str
     return {
       message: `workflow.seed_backlog:${created.length}`,
       created,
+      ...readV2ApiData(brainId),
+    }
+  }
+
+  if (method === 'workflow.watch_ping') {
+    const token = typeof params.token === 'string' && params.token.trim() ? params.token.trim() : nextId('ping')
+    const event = appendEvent(brainId, {
+      actor: typeof params.actor === 'string' ? params.actor : 'founder-ceo',
+      layer: 'system',
+      stage: 'execution',
+      kind: 'task_started',
+      message: `watch_ping:${token}`,
+      refs: [],
+    })
+    return {
+      message: `workflow.watch_ping:${token}`,
+      token,
+      event,
       ...readV2ApiData(brainId),
     }
   }
