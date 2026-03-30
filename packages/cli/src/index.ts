@@ -44,6 +44,17 @@ type BrainStep = {
   dependencies: string[]
 }
 
+type SquadConfig = {
+  id: string
+  name: string
+  memberAgentIds: string[]
+}
+
+type SquadState = {
+  activeSquadId: string
+  squads: SquadConfig[]
+}
+
 type InitPreset = 'core' | 'codex-team'
 
 type InitOptions = {
@@ -138,6 +149,20 @@ function parseOption(args: string[], name: string): string | undefined {
 
 function hasFlag(args: string[], name: string): boolean {
   return args.includes(name) || args.some(arg => arg.startsWith(`${name}=`))
+}
+
+function removeOptionArgs(args: string[], name: string): string[] {
+  const out: string[] = []
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i]
+    if (arg === name) {
+      i += 1
+      continue
+    }
+    if (arg.startsWith(`${name}=`)) continue
+    out.push(arg)
+  }
+  return out
 }
 
 function isoNow(): string {
@@ -787,6 +812,130 @@ function appendMissionTeamBoard(brainRoot: string, featureName: string, stepId: 
   ].join('\n')
   fs.writeFileSync(teamBoardPath, `${content.trimEnd()}\n${section}`)
   return stepNumber
+}
+
+function missionControlStatePath(brainRoot: string): string {
+  return path.join(brainRoot, '.brian', 'mission-control.json')
+}
+
+function readSquadState(brainRoot: string): SquadState {
+  const filePath = missionControlStatePath(brainRoot)
+  try {
+    if (!fs.existsSync(filePath)) {
+      return {
+        activeSquadId: 'squad-core',
+        squads: [{ id: 'squad-core', name: 'Core Squad', memberAgentIds: ['project-operator', 'product-lead', 'frontend-engineer'] }],
+      }
+    }
+    const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8')) as Partial<SquadState>
+    const squads = Array.isArray(parsed.squads)
+      ? parsed.squads
+          .filter((sq): sq is SquadConfig => Boolean(sq && typeof sq.id === 'string' && typeof sq.name === 'string'))
+          .map((sq) => ({
+            id: sq.id.trim(),
+            name: sq.name.trim(),
+            memberAgentIds: Array.isArray(sq.memberAgentIds)
+              ? sq.memberAgentIds.map((id) => String(id).trim()).filter(Boolean)
+              : [],
+          }))
+          .filter((sq) => Boolean(sq.id && sq.name))
+      : []
+    if (squads.length === 0) {
+      return {
+        activeSquadId: 'squad-core',
+        squads: [{ id: 'squad-core', name: 'Core Squad', memberAgentIds: ['project-operator'] }],
+      }
+    }
+    const active = typeof parsed.activeSquadId === 'string' && squads.some((sq) => sq.id === parsed.activeSquadId)
+      ? parsed.activeSquadId
+      : squads[0].id
+    return { activeSquadId: active, squads }
+  } catch {
+    return {
+      activeSquadId: 'squad-core',
+      squads: [{ id: 'squad-core', name: 'Core Squad', memberAgentIds: ['project-operator'] }],
+    }
+  }
+}
+
+function resolveSquad(brainRoot: string, squadSelector?: string): SquadConfig {
+  const state = readSquadState(brainRoot)
+  const selector = (squadSelector ?? '').trim().toLowerCase()
+  if (!selector) {
+    return state.squads.find((sq) => sq.id === state.activeSquadId) ?? state.squads[0]
+  }
+  const byId = state.squads.find((sq) => sq.id.toLowerCase() === selector)
+  if (byId) return byId
+  const byName = state.squads.find((sq) => sq.name.toLowerCase() === selector)
+  if (byName) return byName
+  return state.squads.find((sq) => sq.id === state.activeSquadId) ?? state.squads[0]
+}
+
+function mergePriority(agentId: string): number {
+  const order = [
+    'project-operator',
+    'product-lead',
+    'backend-engineer',
+    'frontend-engineer',
+    'mobile-engineer',
+    'devops-release',
+  ]
+  const idx = order.indexOf(agentId)
+  return idx >= 0 ? idx : order.length + 1
+}
+
+function appendSquadMissionTeamBoard(
+  brainRoot: string,
+  featureName: string,
+  stepId: string,
+  squad: SquadConfig
+): { stepNumber: string; mergeOrder: string[]; worktrees: string[] } {
+  const teamBoardPath = path.join(commandsDirPath(brainRoot), 'team-board.md')
+  writeFileIfMissing(
+    teamBoardPath,
+    '# team board\n\n> Part of [[index]]\n\n## Phase 99 - Team Board\n'
+  )
+  const content = fs.readFileSync(teamBoardPath, 'utf8')
+  const escapedName = featureName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const escapedSquad = squad.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const existing = content.match(new RegExp(`###\\s+Step\\s+(99\\.\\d+)\\s*:\\s*Deliver\\s+${escapedName}\\s+\\(${escapedSquad}\\)`, 'i'))
+  if (existing) {
+    return { stepNumber: existing[1], mergeOrder: [], worktrees: [] }
+  }
+
+  const nums = [...content.matchAll(/###\s+Step\s+99\.(\d+)\s*:/gi)].map(match => Number(match[1]))
+  const next = (nums.length > 0 ? Math.max(...nums) + 1 : 1)
+  const stepNumber = `99.${next}`
+  const members = squad.memberAgentIds.length > 0 ? squad.memberAgentIds : ['project-operator']
+  const uniqueMembers = Array.from(new Set(members))
+  const mergeOrder = [...uniqueMembers].sort((a, b) => mergePriority(a) - mergePriority(b))
+  const baseSlug = slugify(featureName)
+  const worktrees = mergeOrder.map((member) => `feature/${baseSlug}-${slugify(member)}`)
+
+  const nextTasks = mergeOrder.map((member) => {
+    const worktree = `feature/${baseSlug}-${slugify(member)}`
+    return `- [ ] NEXT: feature="${featureName} (${member})" worktree=${worktree} owner=${member} image=pending breaking=none`
+  })
+  const mergeTasks = mergeOrder.map((member) => {
+    const worktree = `feature/${baseSlug}-${slugify(member)}`
+    return `- [ ] MERGE: worktree=${worktree} -> main feature="${featureName}" owner=${member} image=pending breaking=none`
+  })
+
+  const section = [
+    '',
+    `### Step ${stepNumber}: Deliver ${featureName} (${squad.name})`,
+    '- **Status**: not_started',
+    `- **Squad**: ${squad.name} (${squad.id})`,
+    `- **Step**: ${stepId}`,
+    `- **Merge Order**: ${mergeOrder.join(' -> ')}`,
+    ...nextTasks,
+    `- [ ] VERIFY: Human verified "${featureName}" across squad slices before merge.`,
+    ...mergeTasks,
+    '- [ ] BLOCKER: Capture blockers and unblock condition.',
+    '',
+  ].join('\n')
+  fs.writeFileSync(teamBoardPath, `${content.trimEnd()}\n${section}`)
+  return { stepNumber, mergeOrder, worktrees }
 }
 
 function ensureV2Docs(brainRoot: string) {
@@ -2069,10 +2218,11 @@ function showHelp() {
     brian intent <text>             Capture initiative intent
     brian propose <name>            Create proposal-stage initiative
     brian shape <initiative-id>     Move initiative to tribe shaping stage
-    brian plan <initiative-id>      Move initiative to squad planning stage
+    brian plan <initiative-id> [--squad <name>]   Plan initiative using a squad's agent roster
     brian work                      Launch Codex with managed Brian start context
     brian verify                    Record verification gate for active initiative
     brian merge                     Record merge completion for active initiative
+    brian mission <name> [--squad <name>]  Prepare a mission packet + squad worktree queue
     brian end                       Create handoff + launch managed wrap-up context
     brian brief                     Generate director briefing note
     brian decide <id> <title>       Record director decision
@@ -2172,7 +2322,7 @@ async function main() {
   const allArgs = process.argv.slice(2)
   const command = allArgs[0] && !allArgs[0].startsWith('-') ? allArgs[0] : 'start'
   const args = commandArgs(allArgs, command)
-  const retiredCommands = new Set(['next', 'mission', 'spec', 'feature', 'sprint', 'sync', 'notes', 'wrap-up', 'migrate'])
+  const retiredCommands = new Set(['next', 'spec', 'feature', 'sprint', 'sync', 'notes', 'wrap-up', 'migrate'])
 
   if (command === 'help' || hasFlag(args, '--help') || hasFlag(args, '-h')) {
     showHelp()
@@ -2601,14 +2751,16 @@ async function main() {
       return
     }
 
-    const stepArg = args[0]
+    const squadName = parseOption(args, '--squad')
+    const positionalArgs = removeOptionArgs(args, '--squad')
+    const stepArg = positionalArgs[0]
     const initiatives = listV2Initiatives(brainRoot)
     const looksLegacyStep = typeof stepArg === 'string' && /^ep-/i.test(stepArg)
     const initiativeMatch = stepArg ? initiatives.find((item) => item.id.toLowerCase() === stepArg.toLowerCase()) : null
 
     if (!looksLegacyStep && (initiativeMatch || (initiatives.length > 0 && stepArg && !/^ep-/i.test(stepArg)))) {
       if (!stepArg) {
-        console.log('  Usage: brian plan <initiative-id>')
+        console.log('  Usage: brian plan <initiative-id> [--squad <name>]')
         return
       }
       if (!initiativeMatch) {
@@ -2631,8 +2783,19 @@ async function main() {
         message: `initiative planned: ${initiativeMatch.title}`,
         initiativeId: initiativeMatch.id,
       })
+      const squad = resolveSquad(brainRoot, squadName)
+      const board = appendSquadMissionTeamBoard(brainRoot, initiativeMatch.title, initiativeMatch.id, squad)
       console.log(`  Initiative planned: ${initiativeMatch.id}`)
+      console.log(`  Squad: ${squad.name} (${squad.id})`)
       console.log(`  Note: ${notePath}`)
+      console.log(`  Team board step: ${board.stepNumber}`)
+      if (board.worktrees.length > 0) {
+        console.log(`  Worktrees queued (${board.worktrees.length}):`)
+        for (const wt of board.worktrees) console.log(`  - ${wt}`)
+        console.log(`  Merge order: ${board.mergeOrder.join(' -> ')}`)
+      } else {
+        console.log('  Team board step already existed; no new worktrees added.')
+      }
       return
     }
 
@@ -2664,6 +2827,7 @@ async function main() {
       printSteps('Ready to plan', readySteps)
       console.log('  Next:')
       console.log('  - Run `brian plan <step-id>` to create a linked plan note.')
+      console.log('  - Optional: pass `--squad "<name>"` to bind queue generation to a squad roster.')
       console.log('  - In Codex, use `/plan` for the conversation-level planning pass.')
       console.log('')
       return
@@ -2780,21 +2944,32 @@ async function main() {
     }
     warnLegacyAlias(brainRoot, 'mission')
 
-    const featureName = args.join(' ').trim()
+    const squadName = parseOption(args, '--squad')
+    const positionalArgs = removeOptionArgs(args, '--squad')
+    const featureName = positionalArgs.join(' ').trim()
     if (!featureName) {
-      console.log('  Usage: brian mission <name>')
+      console.log('  Usage: brian mission <name> [--squad <name>]')
       return
     }
 
     const packet = createSpecPacket(brainRoot, featureName)
     const stepId = appendMissionExecutionPlan(brainRoot, featureName, packet.slug)
-    const teamStep = appendMissionTeamBoard(brainRoot, featureName, stepId)
+    const squad = resolveSquad(brainRoot, squadName)
+    const teamStep = appendSquadMissionTeamBoard(brainRoot, featureName, stepId, squad)
 
     console.log(`  Mission prepared for "${featureName}"`)
+    console.log(`  Squad: ${squad.name} (${squad.id})`)
     console.log(`  Spec packet: ${packet.dir}`)
     console.log(`  Execution plan: ${stepId}`)
-    console.log(`  Team board: Step ${teamStep}`)
-    console.log('  Next: run `brian plan ' + stepId + '` then `brian work`.')
+    console.log(`  Team board: Step ${teamStep.stepNumber}`)
+    if (teamStep.worktrees.length > 0) {
+      console.log(`  Worktrees queued (${teamStep.worktrees.length}):`)
+      for (const wt of teamStep.worktrees) console.log(`  - ${wt}`)
+      console.log(`  Merge order: ${teamStep.mergeOrder.join(' -> ')}`)
+    } else {
+      console.log('  Team board step already existed; no new worktrees added.')
+    }
+    console.log('  Next: run `brian plan <initiative-id> --squad "' + squad.name + '"` then `brian work`.')
     return
   }
 
