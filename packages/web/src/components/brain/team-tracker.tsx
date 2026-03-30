@@ -158,12 +158,17 @@ export default function TeamTracker({
 
   useEffect(() => {
     const refreshRuntimeState = async () => {
-      const [runRes, repoRes, suggestionRes, squadsRes] = await Promise.all([
+      const [snapshotRes, runRes, repoRes, suggestionRes, squadsRes] = await Promise.all([
+        call<{ snapshot: SnapshotResult['snapshot'] }>('team.get_snapshot'),
         call<{ run: SnapshotResult['run']; active: boolean; observer?: SnapshotResult['observer'] }>('team.get_run_state'),
         call<{ repo: RepoState }>('team.get_repo_state'),
         call<{ suggested: string }>('team.get_suggested'),
         call<{ squads: Array<{ id: string; name: string; memberAgentIds: string[] }>; activeSquadId: string; agentCatalog: Array<{ id: string; label: string }> }>('team.get_squads'),
       ])
+      if (snapshotRes.ok && snapshotRes.result?.snapshot) {
+        setSteps(snapshotRes.result.snapshot.executionSteps)
+        setHandoffList(snapshotRes.result.snapshot.handoffs)
+      }
       if (runRes.ok && runRes.result) {
         setRunState(runRes.result.run ?? null)
         setRunActive(Boolean(runRes.result.active))
