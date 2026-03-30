@@ -80,6 +80,12 @@ type TeamObserver = {
   timer: NodeJS.Timeout
 }
 
+type SquadConfig = {
+  id: string
+  name: string
+  memberAgentIds: string[]
+}
+
 const activeRuns = new Map<string, BrainRun>()
 const activeChildren = new Map<string, ChildProcess>()
 const teamObservers = new Map<string, TeamObserver>()
@@ -186,6 +192,10 @@ function inferActor(label: string): string {
   if (lower.includes('growth') || lower.includes('marketing')) return 'growth-marketing'
   if (lower.includes('mobile')) return 'mobile-engineer'
   return 'project-operator'
+}
+
+function discussionActor(agentId: string): string {
+  return agentId || 'project-operator'
 }
 
 function classifyStage(line: string): 'planning' | 'coding' | 'verification' | 'blocker' | 'system' {
@@ -415,7 +425,11 @@ function runObserverTick(wss: WebSocketServer, brainId: string): { added: number
   return { added, totalIssues: issues.length }
 }
 
-function startCodexRunForSuggestion(wss: WebSocketServer, brainId: string) {
+function startCodexRunForSuggestion(
+  wss: WebSocketServer,
+  brainId: string,
+  squad?: { id: string; name: string; memberAgentIds: string[] }
+) {
   const existing = activeRuns.get(brainId)
   if (existing && activeChildren.has(brainId)) {
     return existing
@@ -436,8 +450,10 @@ function startCodexRunForSuggestion(wss: WebSocketServer, brainId: string) {
   activeRuns.set(brainId, run)
 
   const cwd = getBrainPathForId(brainId)
+  const squadContext = squad ? `You are operating as squad "${squad.name}" (${squad.memberAgentIds.join(', ')}).` : ''
   const prompt = [
     `Start focused implementation work for this task: ${label}.`,
+    squadContext,
     'Read brian/index.md, AGENTS.md, brian/execution-plan.md, and latest handoff first.',
     'Make real code and note updates, verify, and print compact progress checkpoints.',
   ].join(' ')
@@ -462,7 +478,10 @@ function startCodexRunForSuggestion(wss: WebSocketServer, brainId: string) {
         run.status = 'blocked'
         run.blockerReason = line
       }
-      broadcastTeamEvent(wss, brainId, `[${stream}] ${line}`, {
+      const message = stage === 'blocker' && !/escalat/i.test(line)
+        ? `requires escalation (not escalated in squad-only mode): ${line}`
+        : line
+      broadcastTeamEvent(wss, brainId, `[${stream}] ${message}`, {
         actor: run.actor,
         stage,
         kind: stage === 'blocker' ? 'blocker' : 'info',
@@ -502,6 +521,29 @@ function startCodexRunForSuggestion(wss: WebSocketServer, brainId: string) {
     broadcastSnapshotToBrainSubscribers(brainId, postRun.snapshot as TeamSnapshot)
   })
 
+  const members = squad?.memberAgentIds?.length ? squad.memberAgentIds : [run.actor, 'product-lead', 'project-operator']
+  broadcastTeamEvent(wss, brainId, `alignment: ${label}`, {
+    actor: discussionActor(members[0]),
+    stage: 'planning',
+    kind: 'status',
+  })
+  broadcastTeamEvent(wss, brainId, `planning: task breakdown + acceptance checks for "${label}"`, {
+    actor: discussionActor(members[1] ?? members[0]),
+    stage: 'planning',
+    kind: 'status',
+  })
+  if (label.includes('?')) {
+    broadcastTeamEvent(wss, brainId, `blocking question identified; requires escalation (not escalated in squad-only mode): ${label}`, {
+      actor: discussionActor(members[2] ?? members[0]),
+      stage: 'blocker',
+      kind: 'blocker',
+    })
+  }
+  broadcastTeamEvent(wss, brainId, `execution: ${label}`, {
+    actor: discussionActor(run.actor),
+    stage: 'coding',
+    kind: 'status',
+  })
   broadcastTeamEvent(wss, brainId, `run_started:${label}`, { actor: run.actor, stage: 'planning', kind: 'status' })
   return run
 }
@@ -558,6 +600,10 @@ app.prepare().then(() => {
 
           try {
             if (method === 'team.start_next_task') {
+              const requestedSquadId = typeof params.squadId === 'string' ? params.squadId.trim() : ''
+              if (requestedSquadId) {
+                runTeamMcpCall(brainId, 'team.set_active_squad', { squadId: requestedSquadId })
+              }
               const repoState = runTeamMcpCall(brainId, 'team.get_repo_state', {})
               if (repoState.repo && (!repoState.repo.canStartNextWork || repoState.repo.hasConflicts || repoState.repo.hardBlockers.length > 0)) {
                 const blocked = {
@@ -588,7 +634,12 @@ app.prepare().then(() => {
                 })
                 return
               }
-              const run = startCodexRunForSuggestion(wss, brainId)
+              const squadState = runTeamMcpCall(brainId, 'team.get_squads', {}) as {
+                squads?: SquadConfig[]
+                activeSquadId?: string
+              }
+              const activeSquad = (squadState.squads ?? []).find((sq) => sq.id === squadState.activeSquadId)
+              const run = startCodexRunForSuggestion(wss, brainId, activeSquad)
               if (!run) {
                 const blocked = { ...result, message: 'start_blocked:no_suggestion_available' }
                 if (ws.readyState === WebSocket.OPEN) {

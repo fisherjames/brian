@@ -94,7 +94,7 @@ export function BrainLayout({
   }, []);
 
   const [activeTabId, setActiveTabId] = useState('mission');
-  const [tabs, setTabs] = useState<Tab[]>([MISSION_TAB, DIRECTORS_TAB, TRIBE_TAB, TEAM_TAB, GRAPH_TAB, AGENTS_TAB]);
+  const [tabs, setTabs] = useState<Tab[]>([GRAPH_TAB, AGENTS_TAB, MISSION_TAB, DIRECTORS_TAB, TRIBE_TAB, TEAM_TAB]);
   useEffect(() => {
     const requestedTab = new URLSearchParams(window.location.search).get('tab')
     if (!requestedTab) return

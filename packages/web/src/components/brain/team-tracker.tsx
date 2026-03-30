@@ -71,6 +71,9 @@ type SnapshotResult = {
     addedTasks: number
     startedAt: string | null
   }
+  squads?: Array<{ id: string; name: string; memberAgentIds: string[] }>
+  activeSquadId?: string
+  agentCatalog?: Array<{ id: string; label: string }>
 }
 
 function parseMergeBranchMetadata(text: string): { sourceBranch: string; targetBranch: string } | null {
@@ -138,6 +141,11 @@ export default function TeamTracker({
   const [hasSeenConnected, setHasSeenConnected] = useState(false)
   const [connectionGraceExpired, setConnectionGraceExpired] = useState(false)
   const [lastUpdateAt, setLastUpdateAt] = useState<string>('')
+  const [squads, setSquads] = useState<Array<{ id: string; name: string; memberAgentIds: string[] }>>([])
+  const [activeSquadId, setActiveSquadId] = useState('')
+  const [agentCatalog, setAgentCatalog] = useState<Array<{ id: string; label: string }>>([])
+  const [editingSquadName, setEditingSquadName] = useState('')
+  const [editingMembers, setEditingMembers] = useState<string[]>([])
   const { connected, events, call } = useMcpTeam(brainId)
 
   useEffect(() => setSteps(executionSteps), [executionSteps])
@@ -152,10 +160,11 @@ export default function TeamTracker({
 
   useEffect(() => {
     const refreshRuntimeState = async () => {
-      const [runRes, repoRes, suggestionRes] = await Promise.all([
+      const [runRes, repoRes, suggestionRes, squadsRes] = await Promise.all([
         call<{ run: SnapshotResult['run']; active: boolean; observer?: SnapshotResult['observer'] }>('team.get_run_state'),
         call<{ repo: RepoState }>('team.get_repo_state'),
         call<{ suggested: string }>('team.get_suggested'),
+        call<{ squads: Array<{ id: string; name: string; memberAgentIds: string[] }>; activeSquadId: string; agentCatalog: Array<{ id: string; label: string }> }>('team.get_squads'),
       ])
       if (runRes.ok && runRes.result) {
         setRunState(runRes.result.run ?? null)
@@ -164,6 +173,18 @@ export default function TeamTracker({
       }
       if (repoRes.ok && repoRes.result?.repo) setRepoState(repoRes.result.repo)
       if (suggestionRes.ok && suggestionRes.result) setServerSuggested(suggestionRes.result.suggested ?? '')
+      if (squadsRes.ok && squadsRes.result) {
+        const nextSquads = squadsRes.result.squads ?? []
+        const nextActive = squadsRes.result.activeSquadId ?? ''
+        setSquads(nextSquads)
+        setActiveSquadId(nextActive)
+        setAgentCatalog(squadsRes.result.agentCatalog ?? [])
+        const selected = nextSquads.find((sq) => sq.id === nextActive)
+        if (selected) {
+          setEditingSquadName(selected.name)
+          setEditingMembers(selected.memberAgentIds)
+        }
+      }
       setLastUpdateAt(new Date().toISOString())
     }
 
@@ -350,6 +371,53 @@ export default function TeamTracker({
     }
   }
 
+  async function switchSquad(squadId: string) {
+    setActionError(null)
+    setActiveSquadId(squadId)
+    const res = await call<SnapshotResult>('team.set_active_squad', { squadId })
+    if (!res.ok || !res.result) {
+      setActionError(res.error ? `Action failed: ${res.error}` : 'Failed to switch squad.')
+      return
+    }
+    const result = res.result
+    if (result.squads) setSquads(result.squads)
+    if (result.activeSquadId) setActiveSquadId(result.activeSquadId)
+    const selected = (result.squads ?? []).find((sq) => sq.id === (result.activeSquadId ?? squadId))
+    if (selected) {
+      setEditingSquadName(selected.name)
+      setEditingMembers(selected.memberAgentIds)
+    }
+    setLastUpdateAt(new Date().toISOString())
+  }
+
+  async function saveSquad(updateExisting: boolean) {
+    setActionError(null)
+    const name = editingSquadName.trim()
+    if (!name) {
+      setActionError('Squad name is required.')
+      return
+    }
+    const payload: Record<string, unknown> = {
+      name,
+      memberAgentIds: editingMembers,
+    }
+    if (updateExisting && activeSquadId) payload.squadId = activeSquadId
+    const res = await call<SnapshotResult>('team.upsert_squad', payload)
+    if (!res.ok || !res.result) {
+      setActionError(res.error ? `Action failed: ${res.error}` : 'Failed to save squad.')
+      return
+    }
+    const result = res.result
+    setSquads(result.squads ?? [])
+    setActiveSquadId(result.activeSquadId ?? activeSquadId)
+    const selected = (result.squads ?? []).find((sq) => sq.id === (result.activeSquadId ?? activeSquadId))
+    if (selected) {
+      setEditingSquadName(selected.name)
+      setEditingMembers(selected.memberAgentIds)
+    }
+    setLastUpdateAt(new Date().toISOString())
+  }
+
   async function openHandoff(path: string) {
     setSelectedHandoffPath(path)
     setSelectedHandoffContent('Loading handoff...')
@@ -386,6 +454,59 @@ export default function TeamTracker({
           </div>
           <p className="mt-1 text-[12px] text-text-muted">Squad execution command center: run work, verify outcomes, merge verified worktrees.</p>
           <p className="mt-1 text-[12px] text-text-muted">{suggested}</p>
+          <div className="mt-2 rounded-md border border-border/70 bg-bg p-2">
+            <p className="text-[11px] font-medium text-text-secondary">Squad</p>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <select
+                value={activeSquadId}
+                onChange={(e) => void switchSquad(e.target.value)}
+                className="min-w-[180px] rounded-md border border-border bg-bg px-2 py-1.5 text-[12px] text-text-secondary outline-none"
+              >
+                {(squads.length === 0 ? [{ id: '', name: 'No squads' }] : squads).map((sq) => (
+                  <option key={sq.id || 'none'} value={sq.id}>
+                    {sq.name}
+                  </option>
+                ))}
+              </select>
+              <input
+                value={editingSquadName}
+                onChange={(e) => setEditingSquadName(e.target.value)}
+                placeholder="Squad name"
+                className="min-w-[180px] flex-1 rounded-md border border-border bg-bg px-2 py-1.5 text-[12px] text-text-secondary outline-none"
+              />
+              <button
+                onClick={() => void saveSquad(true)}
+                className="rounded-md border border-border bg-bg px-2.5 py-1.5 text-[12px] text-text-secondary hover:bg-text/5"
+              >
+                Update Squad
+              </button>
+              <button
+                onClick={() => void saveSquad(false)}
+                className="rounded-md border border-border bg-bg px-2.5 py-1.5 text-[12px] text-text-secondary hover:bg-text/5"
+              >
+                Create Squad
+              </button>
+            </div>
+            <div className="mt-2 grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
+              {agentCatalog.map((agent) => {
+                const checked = editingMembers.includes(agent.id)
+                return (
+                  <label key={agent.id} className="inline-flex items-center gap-1.5 text-[12px] text-text-secondary">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) =>
+                        setEditingMembers((prev) =>
+                          e.target.checked ? Array.from(new Set([...prev, agent.id])) : prev.filter((id) => id !== agent.id)
+                        )
+                      }
+                    />
+                    <span>{agent.label}</span>
+                  </label>
+                )
+              })}
+            </div>
+          </div>
           {currentTask && (
             <div className={`mt-2 rounded-md border p-2 ${systemStatus === 'blocked' ? 'border-[#D95B5B]/40 bg-[#D95B5B]/10' : 'border-border/70 bg-bg'}`}>
               <p className="text-[11px] font-medium text-text-secondary">Current Task</p>
@@ -410,7 +531,7 @@ export default function TeamTracker({
 
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <button
-              onClick={() => apply('team.start_next_task', {}, 'start')}
+              onClick={() => apply('team.start_next_task', { squadId: activeSquadId }, 'start')}
               disabled={busy === 'start' || hardBlockers.length > 0 || !hasRunnableSuggestion || !connected}
               className="inline-flex items-center gap-1.5 rounded-md border border-border bg-bg px-2.5 py-1.5 text-[12px] text-text-secondary hover:bg-text/5 disabled:opacity-50"
             >
@@ -696,7 +817,7 @@ export default function TeamTracker({
 
         <div className="grid gap-3 lg:grid-cols-2">
           <div className="rounded-lg border border-border bg-bg-section p-3">
-            <p className="text-[10px] uppercase tracking-wide text-text-muted">Live Output</p>
+            <p className="text-[10px] uppercase tracking-wide text-text-muted">Discussion</p>
             <div className="mt-2 flex max-h-[260px] flex-col gap-1 overflow-y-auto">
               {personaEvents.map((event, idx) => {
                 const cleaned = event.message

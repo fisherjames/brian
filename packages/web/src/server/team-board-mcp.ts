@@ -54,6 +54,9 @@ type McpResult = {
     blockedAt?: string
     details: Array<{ item: string; status: 'ready' | 'blocked' | 'merged'; reason?: string }>
   }
+  squads?: SquadConfig[]
+  activeSquadId?: string
+  agentCatalog?: Array<{ id: string; label: string }>
 }
 
 type WorktreeEntry = {
@@ -62,12 +65,101 @@ type WorktreeEntry = {
   detached: boolean
 }
 
+type SquadConfig = {
+  id: string
+  name: string
+  memberAgentIds: string[]
+}
+
+type SquadState = {
+  activeSquadId: string
+  squads: SquadConfig[]
+}
+
+const SQUAD_AGENT_CATALOG: Array<{ id: string; label: string }> = [
+  { id: 'project-operator', label: 'Project Operator' },
+  { id: 'product-lead', label: 'Product Lead' },
+  { id: 'frontend-engineer', label: 'Frontend Engineer' },
+  { id: 'backend-engineer', label: 'Backend Engineer' },
+  { id: 'mobile-engineer', label: 'Mobile Engineer' },
+  { id: 'devops-release', label: 'DevOps / Release' },
+  { id: 'growth-marketing', label: 'Growth / Marketing' },
+  { id: 'director', label: 'Director' },
+  { id: 'tribe-head', label: 'Tribe Head' },
+  { id: 'founder-ceo', label: 'Founder / CEO' },
+]
+
 function snapshotForBrain(brainPath: string): Snapshot {
   const files = scanBrainFiles(brainPath)
   return {
     executionSteps: getExecutionSteps(brainPath, files) as ExecutionStep[],
     handoffs: getHandoffs(brainPath, files),
   }
+}
+
+function missionControlStatePath(brainPath: string): string {
+  return path.join(brainPath, '.brian', 'mission-control.json')
+}
+
+function defaultSquadState(): SquadState {
+  return {
+    activeSquadId: 'squad-core',
+    squads: [
+      {
+        id: 'squad-core',
+        name: 'Core Squad',
+        memberAgentIds: ['project-operator', 'product-lead', 'frontend-engineer', 'backend-engineer'],
+      },
+    ],
+  }
+}
+
+function normalizeSquadState(input: Partial<SquadState> | null | undefined): SquadState {
+  const fallback = defaultSquadState()
+  const squads = Array.isArray(input?.squads)
+    ? input!.squads
+      .filter((sq): sq is SquadConfig => Boolean(sq && typeof sq.id === 'string' && typeof sq.name === 'string'))
+      .map((sq) => ({
+        id: sq.id.trim() || `squad-${Date.now().toString(36)}`,
+        name: sq.name.trim() || 'Unnamed Squad',
+        memberAgentIds: Array.isArray(sq.memberAgentIds)
+          ? sq.memberAgentIds.map((id) => String(id).trim()).filter(Boolean)
+          : [],
+      }))
+    : fallback.squads
+
+  const activeSquadId = typeof input?.activeSquadId === 'string' && input.activeSquadId.trim()
+    ? input.activeSquadId.trim()
+    : squads[0]?.id ?? fallback.activeSquadId
+
+  return {
+    activeSquadId: squads.some((sq) => sq.id === activeSquadId) ? activeSquadId : (squads[0]?.id ?? fallback.activeSquadId),
+    squads: squads.length > 0 ? squads : fallback.squads,
+  }
+}
+
+function readSquadState(brainPath: string): SquadState {
+  const statePath = missionControlStatePath(brainPath)
+  try {
+    if (!fs.existsSync(statePath)) {
+      const seeded = defaultSquadState()
+      fs.mkdirSync(path.dirname(statePath), { recursive: true })
+      fs.writeFileSync(statePath, JSON.stringify(seeded, null, 2) + '\n', 'utf8')
+      return seeded
+    }
+    const raw = fs.readFileSync(statePath, 'utf8')
+    return normalizeSquadState(JSON.parse(raw) as Partial<SquadState>)
+  } catch {
+    return defaultSquadState()
+  }
+}
+
+function writeSquadState(brainPath: string, state: SquadState): SquadState {
+  const statePath = missionControlStatePath(brainPath)
+  const normalized = normalizeSquadState(state)
+  fs.mkdirSync(path.dirname(statePath), { recursive: true })
+  fs.writeFileSync(statePath, JSON.stringify(normalized, null, 2) + '\n', 'utf8')
+  return normalized
 }
 
 function findTargetFile(brainPath: string, stepId: string): string {
@@ -594,6 +686,66 @@ export function runTeamMcpCall(
   const brain = getBrain(brainId)
   if (!brain) throw new Error('Brain not found')
   const brainPath = brain.path
+
+  if (method === 'team.get_squads') {
+    const squads = readSquadState(brainPath)
+    return {
+      message: 'squads_loaded',
+      snapshot: snapshotForBrain(brainPath),
+      squads: squads.squads,
+      activeSquadId: squads.activeSquadId,
+      agentCatalog: SQUAD_AGENT_CATALOG,
+    }
+  }
+
+  if (method === 'team.set_active_squad') {
+    const squadId = String(params.squadId ?? '').trim()
+    const current = readSquadState(brainPath)
+    if (!squadId || !current.squads.some((sq) => sq.id === squadId)) {
+      return {
+        message: `active_squad_not_found:${squadId || 'empty'}`,
+        snapshot: snapshotForBrain(brainPath),
+        squads: current.squads,
+        activeSquadId: current.activeSquadId,
+        agentCatalog: SQUAD_AGENT_CATALOG,
+      }
+    }
+    const next = writeSquadState(brainPath, { ...current, activeSquadId: squadId })
+    return {
+      message: `active_squad_set:${squadId}`,
+      snapshot: snapshotForBrain(brainPath),
+      squads: next.squads,
+      activeSquadId: next.activeSquadId,
+      agentCatalog: SQUAD_AGENT_CATALOG,
+    }
+  }
+
+  if (method === 'team.upsert_squad') {
+    const current = readSquadState(brainPath)
+    const providedId = String(params.squadId ?? '').trim()
+    const name = String(params.name ?? '').trim() || 'Unnamed Squad'
+    const members = Array.isArray(params.memberAgentIds)
+      ? params.memberAgentIds.map((id) => String(id).trim()).filter(Boolean)
+      : []
+    const memberAgentIds = members.length > 0 ? members : ['project-operator']
+    const id = providedId || `squad-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 24) || Date.now().toString(36)}`
+    const existingIdx = current.squads.findIndex((sq) => sq.id === id)
+    const nextSquad: SquadConfig = { id, name, memberAgentIds }
+    const nextSquads = existingIdx >= 0
+      ? current.squads.map((sq, idx) => (idx === existingIdx ? nextSquad : sq))
+      : [...current.squads, nextSquad]
+    const next = writeSquadState(brainPath, {
+      activeSquadId: id,
+      squads: nextSquads,
+    })
+    return {
+      message: existingIdx >= 0 ? `squad_updated:${id}` : `squad_created:${id}`,
+      snapshot: snapshotForBrain(brainPath),
+      squads: next.squads,
+      activeSquadId: next.activeSquadId,
+      agentCatalog: SQUAD_AGENT_CATALOG,
+    }
+  }
 
   if (method === 'team.get_snapshot') {
     return { message: 'snapshot_loaded', snapshot: snapshotForBrain(brainPath) }
