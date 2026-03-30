@@ -20,6 +20,25 @@ type Decision = {
   filePath: string
 }
 
+function normalizeDecision(raw: Partial<Decision> & { id?: string; title?: string; question?: string }): Decision {
+  return {
+    id: raw.id ?? '',
+    title: raw.title ?? 'Untitled decision',
+    status: raw.status === 'approved' || raw.status === 'rejected' ? raw.status : 'pending',
+    question: raw.question ?? '',
+    rationale: raw.rationale ?? '',
+    initiativeId: raw.initiativeId,
+    requiredContextLevel: raw.requiredContextLevel ?? 'director',
+    authorityScope: Array.isArray(raw.authorityScope) ? raw.authorityScope : ['director'],
+    decisionPolicy: raw.decisionPolicy ?? 'delegated_approval',
+    inferable: Boolean(raw.inferable),
+    confidence: typeof raw.confidence === 'number' ? raw.confidence : 0,
+    escalationReason: raw.escalationReason ?? '',
+    escalationPath: Array.isArray(raw.escalationPath) ? raw.escalationPath : ['director'],
+    filePath: raw.filePath ?? '',
+  }
+}
+
 export default function DirectorConsole({
   brainId,
   onOpenRecord,
@@ -35,8 +54,8 @@ export default function DirectorConsole({
   const refresh = useCallback(async () => {
     const res = await fetch(`/api/brains/${brainId}/decisions`, { cache: 'no-store' })
     if (!res.ok) return
-    const json = (await res.json()) as { decisions?: Decision[] }
-    setDecisions(Array.isArray(json.decisions) ? json.decisions : [])
+    const json = (await res.json()) as { decisions?: Array<Partial<Decision>> }
+    setDecisions(Array.isArray(json.decisions) ? json.decisions.map((item) => normalizeDecision(item ?? {})) : [])
   }, [brainId])
 
   useEffect(() => {
@@ -119,7 +138,7 @@ export default function DirectorConsole({
             <div key={item.id} className="mb-2 rounded border border-border/70 bg-[#FCFCFA] p-2 text-[12px] last:mb-0">
               <div className="font-medium">{item.title}</div>
               <div className="mt-1 text-text-secondary">{item.question}</div>
-              <div className="mt-1 text-[11px] text-text-muted">Path: {item.escalationPath.join(' -> ') || 'director'}</div>
+              <div className="mt-1 text-[11px] text-text-muted">Path: {(item.escalationPath ?? []).join(' -> ') || 'director'}</div>
               <div className="text-[11px] text-text-muted">Policy: {item.decisionPolicy} · confidence {Math.round((item.confidence || 0) * 100)}%</div>
               {item.escalationReason && <div className="mt-1 text-[11px] text-text-muted">Escalation reason: {item.escalationReason}</div>}
               <button
