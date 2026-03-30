@@ -44,14 +44,14 @@ export default function TabBar({
     const ctx = ctxMenu.state.context;
     if (!ctx) return [];
     const { tabId, tabIndex } = ctx;
-    const isPinned = tabId === 'graph' || tabId === 'mission-control' || tabId === 'tribe-direction' || tabId === 'directors' || tabId === 'mission' || tabId === 'agents-workflow';
+    const isPinned = tabId === 'graph' || tabId === 'mission-control' || tabId === 'tribe-direction' || tabId === 'directors' || tabId === 'product-owner' || tabId === 'mission' || tabId === 'agents-workflow';
 
     // Count closable tabs to the right (excluding pinned tabs)
     const tabsToRight = tabs
       .slice(tabIndex + 1)
-      .filter((t) => t.id !== 'graph' && t.id !== 'mission-control' && t.id !== 'tribe-direction' && t.id !== 'directors' && t.id !== 'mission' && t.id !== 'agents-workflow');
+      .filter((t) => t.id !== 'graph' && t.id !== 'mission-control' && t.id !== 'tribe-direction' && t.id !== 'directors' && t.id !== 'product-owner' && t.id !== 'mission' && t.id !== 'agents-workflow');
     // Count closable other tabs (excluding pinned tabs and this tab)
-    const otherTabs = tabs.filter((t) => t.id !== 'graph' && t.id !== 'mission-control' && t.id !== 'tribe-direction' && t.id !== 'directors' && t.id !== 'mission' && t.id !== 'agents-workflow' && t.id !== tabId);
+    const otherTabs = tabs.filter((t) => t.id !== 'graph' && t.id !== 'mission-control' && t.id !== 'tribe-direction' && t.id !== 'directors' && t.id !== 'product-owner' && t.id !== 'mission' && t.id !== 'agents-workflow' && t.id !== tabId);
 
     return [
       {
@@ -84,9 +84,9 @@ export default function TabBar({
       {tabs.map((tab, index) => {
         const isActive = tab.id === activeTabId;
         const isGraph = tab.id === 'graph';
-        const isMission = tab.id === 'mission' || tab.id === 'tribe-direction' || tab.id === 'directors' || tab.id === 'agents-workflow';
+        const isMission = tab.id === 'mission' || tab.id === 'tribe-direction' || tab.id === 'directors' || tab.id === 'product-owner' || tab.id === 'agents-workflow';
         const isWorkflow = tab.id === 'mission-control';
-        const isPinned = tab.id === 'graph' || tab.id === 'mission-control' || tab.id === 'tribe-direction' || tab.id === 'directors' || tab.id === 'mission' || tab.id === 'agents-workflow';
+        const isPinned = tab.id === 'graph' || tab.id === 'mission-control' || tab.id === 'tribe-direction' || tab.id === 'directors' || tab.id === 'product-owner' || tab.id === 'mission' || tab.id === 'agents-workflow';
 
         return (
           <button

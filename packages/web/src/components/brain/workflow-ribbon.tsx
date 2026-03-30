@@ -35,6 +35,7 @@ function deriveCurrentStage(state: CompanyState | null): string {
 function nextActionForTab(tabId: string): string {
   if (tabId === 'mission') return 'Define/approve priorities and clear pending decisions.'
   if (tabId === 'directors') return 'Resolve director-level decisions and escalate only if authority/context is insufficient.'
+  if (tabId === 'product-owner') return 'Resolve squad-context decisions first, escalate to tribe only when authority/context is insufficient.'
   if (tabId === 'tribe-direction') return 'Resolve tribe-level decisions and escalate only if authority/context is insufficient.'
   if (tabId === 'mission-control') return 'Run one task, verify outcome, then merge safely.'
   if (tabId === 'agents-workflow') return 'Adjust personas, rules, and skills only when flow quality drops.'

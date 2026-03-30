@@ -12,6 +12,7 @@ import CeoOverview from './ceo-overview';
 import TribeDirection from './tribe-direction';
 import DirectorConsole from './director-console';
 import AgentsWorkflow from './agents-workflow';
+import ProductOwnerView from './product-owner-view';
 import WorkflowRibbon from './workflow-ribbon';
 import { ConnectionStatusIndicator } from './connection-status';
 import { ShareButton } from './share-button';
@@ -52,6 +53,7 @@ const GRAPH_TAB: Tab = { id: 'graph', label: 'Graph + Notes' };
 const TEAM_TAB: Tab = { id: 'mission-control', label: 'Mission Control' };
 const TRIBE_TAB: Tab = { id: 'tribe-direction', label: 'Tribe View' };
 const DIRECTORS_TAB: Tab = { id: 'directors', label: 'Director View' };
+const PRODUCT_OWNER_TAB: Tab = { id: 'product-owner', label: 'Product Owner View' };
 const MISSION_TAB: Tab = { id: 'mission', label: 'CEO View' };
 const AGENTS_TAB: Tab = { id: 'agents-workflow', label: 'Agents + Workflow' };
 
@@ -94,7 +96,7 @@ export function BrainLayout({
   }, []);
 
   const [activeTabId, setActiveTabId] = useState('mission');
-  const [tabs, setTabs] = useState<Tab[]>([GRAPH_TAB, AGENTS_TAB, MISSION_TAB, DIRECTORS_TAB, TRIBE_TAB, TEAM_TAB]);
+  const [tabs, setTabs] = useState<Tab[]>([GRAPH_TAB, MISSION_TAB, DIRECTORS_TAB, PRODUCT_OWNER_TAB, TRIBE_TAB, TEAM_TAB, AGENTS_TAB]);
   useEffect(() => {
     const requestedTab = new URLSearchParams(window.location.search).get('tab')
     if (!requestedTab) return
@@ -103,6 +105,7 @@ export function BrainLayout({
       requestedTab === 'mission-control' ||
       requestedTab === 'tribe-direction' ||
       requestedTab === 'directors' ||
+      requestedTab === 'product-owner' ||
       requestedTab === 'mission' ||
       requestedTab === 'agents-workflow'
     ) {
@@ -174,14 +177,14 @@ export function BrainLayout({
   }
 
   function handleCloseTab(tabId: string) {
-    if (tabId === 'graph' || tabId === 'mission-control' || tabId === 'tribe-direction' || tabId === 'directors' || tabId === 'mission' || tabId === 'agents-workflow') return;
+    if (tabId === 'graph' || tabId === 'mission-control' || tabId === 'tribe-direction' || tabId === 'directors' || tabId === 'product-owner' || tabId === 'mission' || tabId === 'agents-workflow') return;
     setTabs((prev) => prev.filter((t) => t.id !== tabId));
     if (activeTabId === tabId) setActiveTabId('graph');
   }
 
   function handleCloseOthers(tabId: string) {
-    setTabs((prev) => prev.filter((t) => t.id === 'graph' || t.id === 'mission-control' || t.id === 'tribe-direction' || t.id === 'directors' || t.id === 'mission' || t.id === 'agents-workflow' || t.id === tabId));
-    if (activeTabId !== tabId && activeTabId !== 'graph' && activeTabId !== 'mission-control' && activeTabId !== 'tribe-direction' && activeTabId !== 'directors' && activeTabId !== 'mission' && activeTabId !== 'agents-workflow') setActiveTabId(tabId);
+    setTabs((prev) => prev.filter((t) => t.id === 'graph' || t.id === 'mission-control' || t.id === 'tribe-direction' || t.id === 'directors' || t.id === 'product-owner' || t.id === 'mission' || t.id === 'agents-workflow' || t.id === tabId));
+    if (activeTabId !== tabId && activeTabId !== 'graph' && activeTabId !== 'mission-control' && activeTabId !== 'tribe-direction' && activeTabId !== 'directors' && activeTabId !== 'product-owner' && activeTabId !== 'mission' && activeTabId !== 'agents-workflow') setActiveTabId(tabId);
   }
 
   function handleCloseToRight(tabId: string) {
@@ -302,6 +305,8 @@ export function BrainLayout({
             <TribeDirection brainId={brainId} onOpenRecord={handleOpenRecord} />
           ) : activeTabId === 'directors' ? (
             <DirectorConsole brainId={brainId} onOpenRecord={handleOpenRecord} />
+          ) : activeTabId === 'product-owner' ? (
+            <ProductOwnerView brainId={brainId} onOpenRecord={handleOpenRecord} />
           ) : activeTabId === 'mission' ? (
             <CeoOverview brainId={brainId} onOpenRecord={handleOpenRecord} />
           ) : activeTabId === 'agents-workflow' ? (
