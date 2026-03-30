@@ -55,6 +55,7 @@ export interface Handoff {
 const CONFIG_DIR = path.join(os.homedir(), '.brian')
 const CONFIG_FILE = path.join(CONFIG_DIR, 'brains.json')
 const CODEX_SKILLS_DIR = path.join(os.homedir(), '.codex', 'skills')
+const CODEX_RULES_FILE = path.join(os.homedir(), '.codex', 'rules', 'default.rules')
 
 interface BrainsConfig {
   brains: LocalBrain[]
@@ -368,4 +369,14 @@ export function readCodexSkill(skillName: string): string {
 export function writeCodexSkill(skillName: string, content: string): void {
   const filePath = resolveCodexSkillPath(skillName)
   fs.writeFileSync(filePath, content, 'utf8')
+}
+
+export function readCodexRules(): string {
+  if (!fs.existsSync(CODEX_RULES_FILE)) return ''
+  return fs.readFileSync(CODEX_RULES_FILE, 'utf8')
+}
+
+export function writeCodexRules(content: string): void {
+  fs.mkdirSync(path.dirname(CODEX_RULES_FILE), { recursive: true })
+  fs.writeFileSync(CODEX_RULES_FILE, content, 'utf8')
 }

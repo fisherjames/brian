@@ -144,9 +144,6 @@ export default function TeamTracker({
   const [lastUpdateAt, setLastUpdateAt] = useState<string>('')
   const [squads, setSquads] = useState<Array<{ id: string; name: string; memberAgentIds: string[] }>>([])
   const [activeSquadId, setActiveSquadId] = useState('')
-  const [agentCatalog, setAgentCatalog] = useState<Array<{ id: string; label: string }>>([])
-  const [editingSquadName, setEditingSquadName] = useState('')
-  const [editingMembers, setEditingMembers] = useState<string[]>([])
   const { connected, events, call } = useMcpTeam(brainId)
 
   useEffect(() => setSteps(executionSteps), [executionSteps])
@@ -179,12 +176,6 @@ export default function TeamTracker({
         const nextActive = squadsRes.result.activeSquadId ?? ''
         setSquads(nextSquads)
         setActiveSquadId(nextActive)
-        setAgentCatalog(squadsRes.result.agentCatalog ?? [])
-        const selected = nextSquads.find((sq) => sq.id === nextActive)
-        if (selected) {
-          setEditingSquadName(selected.name)
-          setEditingMembers(selected.memberAgentIds)
-        }
       }
       setLastUpdateAt(new Date().toISOString())
     }
@@ -384,39 +375,6 @@ export default function TeamTracker({
     const result = res.result
     if (result.squads) setSquads(result.squads)
     if (result.activeSquadId) setActiveSquadId(result.activeSquadId)
-    const selected = (result.squads ?? []).find((sq) => sq.id === (result.activeSquadId ?? squadId))
-    if (selected) {
-      setEditingSquadName(selected.name)
-      setEditingMembers(selected.memberAgentIds)
-    }
-    setLastUpdateAt(new Date().toISOString())
-  }
-
-  async function saveSquad(updateExisting: boolean) {
-    setActionError(null)
-    const name = editingSquadName.trim()
-    if (!name) {
-      setActionError('Squad name is required.')
-      return
-    }
-    const payload: Record<string, unknown> = {
-      name,
-      memberAgentIds: editingMembers,
-    }
-    if (updateExisting && activeSquadId) payload.squadId = activeSquadId
-    const res = await call<SnapshotResult>('team.upsert_squad', payload)
-    if (!res.ok || !res.result) {
-      setActionError(res.error ? `Action failed: ${res.error}` : 'Failed to save squad.')
-      return
-    }
-    const result = res.result
-    setSquads(result.squads ?? [])
-    setActiveSquadId(result.activeSquadId ?? activeSquadId)
-    const selected = (result.squads ?? []).find((sq) => sq.id === (result.activeSquadId ?? activeSquadId))
-    if (selected) {
-      setEditingSquadName(selected.name)
-      setEditingMembers(selected.memberAgentIds)
-    }
     setLastUpdateAt(new Date().toISOString())
   }
 
@@ -470,43 +428,7 @@ export default function TeamTracker({
                   </option>
                 ))}
               </select>
-              <input
-                value={editingSquadName}
-                onChange={(e) => setEditingSquadName(e.target.value)}
-                placeholder="Squad name"
-                className="min-w-[180px] flex-1 rounded-md border border-border bg-bg px-2 py-1.5 text-[12px] text-text-secondary outline-none"
-              />
-              <button
-                onClick={() => void saveSquad(true)}
-                className="rounded-md border border-border bg-bg px-2.5 py-1.5 text-[12px] text-text-secondary hover:bg-text/5"
-              >
-                Update Squad
-              </button>
-              <button
-                onClick={() => void saveSquad(false)}
-                className="rounded-md border border-border bg-bg px-2.5 py-1.5 text-[12px] text-text-secondary hover:bg-text/5"
-              >
-                Create Squad
-              </button>
-            </div>
-            <div className="mt-2 grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
-              {agentCatalog.map((agent) => {
-                const checked = editingMembers.includes(agent.id)
-                return (
-                  <label key={agent.id} className="inline-flex items-center gap-1.5 text-[12px] text-text-secondary">
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={(e) =>
-                        setEditingMembers((prev) =>
-                          e.target.checked ? Array.from(new Set([...prev, agent.id])) : prev.filter((id) => id !== agent.id)
-                        )
-                      }
-                    />
-                    <span>{agent.label}</span>
-                  </label>
-                )
-              })}
+              <span className="text-[12px] text-text-muted">Configure squads in Agents + Workflow.</span>
             </div>
           </div>
           {currentTask && (

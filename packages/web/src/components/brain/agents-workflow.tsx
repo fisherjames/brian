@@ -7,6 +7,12 @@ type LabStateResult = {
   specialists?: string[]
 }
 
+type SquadConfig = {
+  id: string
+  name: string
+  memberAgentIds: string[]
+}
+
 type EditorPane = {
   path: string
   title: string
@@ -36,12 +42,17 @@ export default function AgentsWorkflow({ brainId }: { brainId: string }) {
     dirty: false,
   })
   const [rulesPane, setRulesPane] = useState<EditorPane>({
-    path: 'brian/org/rules.md',
+    path: '~/.codex/rules/default.rules',
     title: 'Rules',
     value: '',
     loading: false,
     dirty: false,
   })
+  const [squads, setSquads] = useState<SquadConfig[]>([])
+  const [activeSquadId, setActiveSquadId] = useState('')
+  const [agentCatalog, setAgentCatalog] = useState<Array<{ id: string; label: string }>>([])
+  const [editingSquadName, setEditingSquadName] = useState('')
+  const [editingMembers, setEditingMembers] = useState<string[]>([])
   const [error, setError] = useState('')
 
   const loadPath = useCallback(async (path: string): Promise<string> => {
@@ -80,6 +91,24 @@ export default function AgentsWorkflow({ brainId }: { brainId: string }) {
     }
   }, [])
 
+  const loadCodexRules = useCallback(async (): Promise<string> => {
+    const res = await fetch('/api/codex-rules', { cache: 'no-store' })
+    if (res.ok) return await res.text()
+    throw new Error('failed_to_load_rules')
+  }, [])
+
+  const saveCodexRules = useCallback(async (content: string) => {
+    const res = await fetch('/api/codex-rules', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content }),
+    })
+    if (!res.ok) {
+      const text = await res.text()
+      throw new Error(text || 'save_failed')
+    }
+  }, [])
+
   useEffect(() => {
     let cancelled = false
     const load = async () => {
@@ -91,6 +120,19 @@ export default function AgentsWorkflow({ brainId }: { brainId: string }) {
       setSpecialists(nextSpecialists)
       if (!selectedAgent && nextSpecialists.length > 0) {
         setSelectedAgent(nextSpecialists[0])
+      }
+
+      const squadsRes = await call<{ squads: SquadConfig[]; activeSquadId: string; agentCatalog: Array<{ id: string; label: string }> }>('team.get_squads', {})
+      if (cancelled || !squadsRes.ok || !squadsRes.result) return
+      const nextSquads = squadsRes.result.squads ?? []
+      const nextActive = squadsRes.result.activeSquadId ?? ''
+      setSquads(nextSquads)
+      setActiveSquadId(nextActive)
+      setAgentCatalog(squadsRes.result.agentCatalog ?? [])
+      const selected = nextSquads.find((sq) => sq.id === nextActive)
+      if (selected) {
+        setEditingSquadName(selected.name)
+        setEditingMembers(selected.memberAgentIds)
       }
     }
     void load()
@@ -152,13 +194,18 @@ export default function AgentsWorkflow({ brainId }: { brainId: string }) {
     let cancelled = false
     const load = async () => {
       setRulesPane((prev) => ({ ...prev, loading: true }))
-      const rules = await loadPath('brian/org/rules.md')
+      let rules = ''
+      try {
+        rules = await loadCodexRules()
+      } catch {
+        rules = ''
+      }
       if (cancelled) return
-      setRulesPane((prev) => ({ ...prev, value: rules || '# rules\n\n', loading: false, dirty: false }))
+      setRulesPane((prev) => ({ ...prev, value: rules || '# codex rules\n\n', loading: false, dirty: false }))
     }
     void load()
     return () => { cancelled = true }
-  }, [loadPath])
+  }, [loadCodexRules])
 
   const savePane = useCallback(async (pane: EditorPane, setPane: (updater: (prev: EditorPane) => EditorPane) => void) => {
     setError('')
@@ -170,17 +217,118 @@ export default function AgentsWorkflow({ brainId }: { brainId: string }) {
     }
   }, [savePath])
 
+  async function switchSquad(squadId: string) {
+    setError('')
+    setActiveSquadId(squadId)
+    const res = await call<{ squads?: SquadConfig[]; activeSquadId?: string }>('team.set_active_squad', { squadId })
+    if (!res.ok || !res.result) {
+      setError(res.error ? `Action failed: ${res.error}` : 'Failed to switch squad.')
+      return
+    }
+    const nextSquads = res.result.squads ?? squads
+    const nextActive = res.result.activeSquadId ?? squadId
+    setSquads(nextSquads)
+    setActiveSquadId(nextActive)
+    const selected = nextSquads.find((sq) => sq.id === nextActive)
+    if (selected) {
+      setEditingSquadName(selected.name)
+      setEditingMembers(selected.memberAgentIds)
+    }
+  }
+
+  async function saveSquad(updateExisting: boolean) {
+    setError('')
+    const name = editingSquadName.trim()
+    if (!name) {
+      setError('Squad name is required.')
+      return
+    }
+    const payload: Record<string, unknown> = {
+      name,
+      memberAgentIds: editingMembers,
+    }
+    if (updateExisting && activeSquadId) payload.squadId = activeSquadId
+    const res = await call<{ squads?: SquadConfig[]; activeSquadId?: string; agentCatalog?: Array<{ id: string; label: string }> }>('team.upsert_squad', payload)
+    if (!res.ok || !res.result) {
+      setError(res.error ? `Action failed: ${res.error}` : 'Failed to save squad.')
+      return
+    }
+    const nextSquads = res.result.squads ?? squads
+    const nextActive = res.result.activeSquadId ?? activeSquadId
+    setSquads(nextSquads)
+    setActiveSquadId(nextActive)
+    if (res.result.agentCatalog) setAgentCatalog(res.result.agentCatalog)
+    const selected = nextSquads.find((sq) => sq.id === nextActive)
+    if (selected) {
+      setEditingSquadName(selected.name)
+      setEditingMembers(selected.memberAgentIds)
+    }
+  }
+
   return (
     <div className="h-full overflow-y-auto bg-[#F7F6F1] p-4 text-[13px] text-text">
       <div className="mb-4 rounded border border-border bg-white p-3">
         <div className="flex items-center justify-between">
           <div>
             <div className="text-[11px] uppercase tracking-wide text-text-muted">Agents + Workflow</div>
-            <div className="text-[12px] text-text-secondary">Manage agent notes, real Codex skills, and Brian rules in one control surface.</div>
+            <div className="text-[12px] text-text-secondary">Manage squads, agent notes, Codex skills, and Codex rules in one control surface.</div>
           </div>
           <div className={`rounded px-2 py-1 text-[11px] ${connected ? 'bg-[#5B9A65]/10 text-[#5B9A65]' : 'bg-[#D95B5B]/10 text-[#D95B5B]'}`}>
             {connected ? 'MCP connected' : 'MCP offline'}
           </div>
+        </div>
+      </div>
+
+      <div className="mb-4 rounded border border-border bg-white p-3">
+        <div className="mb-2 text-[11px] uppercase tracking-wide text-text-muted">Squads</div>
+        <div className="mb-2 text-[12px] text-text-secondary">Create and update squads used by Mission Control.</div>
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <select
+            value={activeSquadId}
+            onChange={(e) => void switchSquad(e.target.value)}
+            className="min-w-[220px] rounded border border-border px-2 py-1.5 text-[12px]"
+          >
+            {(squads.length === 0 ? [{ id: '', name: 'No squads', memberAgentIds: [] }] : squads).map((sq) => (
+              <option key={sq.id || 'none'} value={sq.id}>{sq.name}</option>
+            ))}
+          </select>
+          <input
+            value={editingSquadName}
+            onChange={(e) => setEditingSquadName(e.target.value)}
+            placeholder="Squad name"
+            className="min-w-[220px] flex-1 rounded border border-border px-2 py-1.5 text-[12px]"
+          />
+          <button
+            onClick={() => void saveSquad(true)}
+            className="rounded border border-border px-2 py-1.5 text-[12px] disabled:opacity-50"
+          >
+            Update Squad
+          </button>
+          <button
+            onClick={() => void saveSquad(false)}
+            className="rounded border border-border px-2 py-1.5 text-[12px] disabled:opacity-50"
+          >
+            Create Squad
+          </button>
+        </div>
+        <div className="grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
+          {agentCatalog.map((agent) => {
+            const checked = editingMembers.includes(agent.id)
+            return (
+              <label key={agent.id} className="inline-flex items-center gap-1.5 text-[12px] text-text-secondary">
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={(e) =>
+                    setEditingMembers((prev) =>
+                      e.target.checked ? Array.from(new Set([...prev, agent.id])) : prev.filter((id) => id !== agent.id)
+                    )
+                  }
+                />
+                <span>{agent.label}</span>
+              </label>
+            )
+          })}
         </div>
       </div>
 
@@ -258,12 +406,21 @@ export default function AgentsWorkflow({ brainId }: { brainId: string }) {
               <div className="text-[11px] font-medium uppercase tracking-wide text-text-muted">Rules</div>
               <button
                 disabled={rulesPane.loading || !rulesPane.dirty}
-                onClick={() => void savePane(rulesPane, setRulesPane)}
+                onClick={async () => {
+                  setError('')
+                  try {
+                    await saveCodexRules(rulesPane.value)
+                    setRulesPane((prev) => ({ ...prev, dirty: false }))
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : 'save_failed')
+                  }
+                }}
                 className="rounded border border-border px-2 py-1 text-[11px] disabled:opacity-50"
               >
                 Save Rules
               </button>
             </div>
+            <div className="mb-2 text-[11px] text-text-muted">Edits `~/.codex/rules/default.rules`.</div>
             <textarea
               value={rulesPane.value}
               onChange={(e) => setRulesPane((prev) => ({ ...prev, value: e.target.value, dirty: true }))}
