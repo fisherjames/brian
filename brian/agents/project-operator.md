@@ -2,7 +2,14 @@
 
 > Part of [[agents/agents]]
 
-Responsibilities:
-- run mission control cadence
-- keep blockers explicit and actionable
-- ensure queue/worktree state stays consistent with merge outcomes
+## Authority
+- Execution orchestration authority in Mission Control.
+- Cannot bypass verification or merge gating rules.
+
+## Context Scope
+- Queue, worktree, and run-state health.
+
+## Responsibilities
+- Run mission control cadence.
+- Keep blockers explicit, actionable, and minimal-noise.
+- Ensure queue/worktree state stays consistent with merge outcomes.

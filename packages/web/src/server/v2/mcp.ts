@@ -157,6 +157,27 @@ const PERSONA_IDENTITY: Record<string, PersonaIdentity> = {
     voice: 'execution rhythm',
     concern: 'Flow throughput and merge safety',
   },
+  'mobile-engineer': {
+    id: 'mobile-engineer',
+    name: 'Noa',
+    role: 'Mobile Engineer',
+    voice: 'device-first and performance-focused',
+    concern: 'Runtime reliability and touch-first UX',
+  },
+  'devops-release': {
+    id: 'devops-release',
+    name: 'Iris',
+    role: 'DevOps / Release',
+    voice: 'operational and risk-aware',
+    concern: 'Deploy safety, observability, and rollback',
+  },
+  'growth-marketing': {
+    id: 'growth-marketing',
+    name: 'Sage',
+    role: 'Growth / Marketing',
+    voice: 'positioning and narrative clarity',
+    concern: 'Message coherence and adoption',
+  },
 }
 
 function persona(actor: string): PersonaIdentity {
@@ -166,6 +187,29 @@ function persona(actor: string): PersonaIdentity {
     role: 'Specialist',
     voice: 'pragmatic',
     concern: 'Execution',
+  }
+}
+
+function missionControlStatePath(brainPath: string): string {
+  return path.join(brainPath, '.brian', 'mission-control.json')
+}
+
+function activeSquadMemberAgentIds(brainPath: string): string[] {
+  try {
+    const filePath = missionControlStatePath(brainPath)
+    if (!fs.existsSync(filePath)) return []
+    const raw = JSON.parse(fs.readFileSync(filePath, 'utf8')) as {
+      activeSquadId?: string
+      squads?: Array<{ id?: string; memberAgentIds?: string[] }>
+    }
+    const activeId = typeof raw.activeSquadId === 'string' ? raw.activeSquadId : ''
+    const squad = Array.isArray(raw.squads)
+      ? raw.squads.find((item) => item && typeof item.id === 'string' && item.id === activeId)
+      : undefined
+    if (!squad || !Array.isArray(squad.memberAgentIds)) return []
+    return squad.memberAgentIds.map((id) => String(id).trim()).filter(Boolean)
+  } catch {
+    return []
   }
 }
 
@@ -202,7 +246,14 @@ function appendThreadMessage(filePath: string, actor: string, message: string) {
   appendSectionLine(filePath, 'Thread', `${new Date().toISOString()} · ${p.name} (${p.id}, ${p.role}): ${message}`)
 }
 
-function discussionPersonas(layer: 'squad' | 'tribe' | 'director', actor: string): string[] {
+function discussionPersonas(brainPath: string, layer: 'squad' | 'tribe' | 'director', actor: string): string[] {
+  if (layer === 'squad') {
+    const fromSquad = activeSquadMemberAgentIds(brainPath)
+    if (fromSquad.length > 0) {
+      const seeded = Array.from(new Set([actor, ...fromSquad]))
+      return seeded
+    }
+  }
   if (layer === 'director') return ['founder-ceo', 'product-lead', 'backend-engineer']
   if (layer === 'tribe') return ['product-lead', 'backend-engineer', 'frontend-engineer', 'project-operator']
   return ['backend-engineer', 'frontend-engineer', 'project-operator', 'product-lead']
@@ -214,29 +265,31 @@ function nextEscalationTarget(layer: 'squad' | 'tribe' | 'director'): 'tribe' | 
   return 'ceo'
 }
 
-function seedDiscussionThread(filePath: string, layer: 'squad' | 'tribe' | 'director', questions: string[], actor: string) {
+function seedDiscussionThread(filePath: string, layer: 'squad' | 'tribe' | 'director', questions: string[], actor: string, personas: string[]) {
   const starter = questions[0] || 'What is the best path forward?'
-  appendThreadMessage(filePath, actor, `Kickoff: ${starter}`)
-  const personas = discussionPersonas(layer, actor)
+  appendThreadMessage(filePath, actor, `Kickoff question: ${starter}`)
   const secondary = questions[1] || 'Which risk should we mitigate first?'
   const tertiary = questions[2] || 'What evidence is required before merge?'
+  const [p0, p1, p2, p3] = personas
   if (layer === 'squad') {
-    appendThreadMessage(filePath, personas[0], `Question: ${secondary}`)
-    appendThreadMessage(filePath, personas[1], 'Counterpoint: we can simplify the UX path if backend contract stays stable.')
-    appendThreadMessage(filePath, personas[2], `Question: ${tertiary}`)
-    appendThreadMessage(filePath, personas[3], 'Proposal: split into two deliverables and preserve user-verification gate.')
+    if (p0) appendThreadMessage(filePath, p0, `Constraint check: ${secondary}`)
+    if (p1) appendThreadMessage(filePath, p1, 'Counterpoint: deliver a smaller vertical slice first to reduce rework.')
+    if (p2) appendThreadMessage(filePath, p2, `Verification requirement: ${tertiary}`)
+    if (p3) appendThreadMessage(filePath, p3, 'Proposal: two worktrees, ordered merge, human verification before merge.')
+    if (p0 && p1) appendThreadMessage(filePath, p0, `Outcome draft: ${persona(p1).name}'s scope split accepted pending implementation risk check.`)
     return
   }
   if (layer === 'tribe') {
-    appendThreadMessage(filePath, personas[0], `Question: ${secondary}`)
-    appendThreadMessage(filePath, personas[1], 'Debate: limiting scope now avoids contract churn later.')
-    appendThreadMessage(filePath, personas[2], 'Debate: if we trim too hard we could hide UX regressions.')
-    appendThreadMessage(filePath, personas[3], `Question: ${tertiary}`)
+    if (p0) appendThreadMessage(filePath, p0, `Tribe question: ${secondary}`)
+    if (p1) appendThreadMessage(filePath, p1, 'Debate: contract-first shaping reduces downstream conflicts.')
+    if (p2) appendThreadMessage(filePath, p2, 'Debate: preserve user-path realism to avoid false-green execution.')
+    if (p3) appendThreadMessage(filePath, p3, `Escalation check: ${tertiary}`)
+    if (p0) appendThreadMessage(filePath, p0, 'Outcome draft: continue shaping unless a hard authority gap appears.')
     return
   }
-  appendThreadMessage(filePath, personas[0], `Question: ${secondary}`)
-  appendThreadMessage(filePath, personas[1], 'Recommendation pending: we need option framing with explicit downside.')
-  appendThreadMessage(filePath, personas[2], `Question: ${tertiary}`)
+  if (p0) appendThreadMessage(filePath, p0, `Director question: ${secondary}`)
+  if (p1) appendThreadMessage(filePath, p1, 'Recommendation: frame options with explicit cost, risk, and expected impact.')
+  if (p2) appendThreadMessage(filePath, p2, `Decision quality check: ${tertiary}`)
 }
 
 function lifecycleEvent(brainId: string, method: string, params: Record<string, unknown>): V2Event {
@@ -907,7 +960,7 @@ export function runV2McpCall(brainId: string, method: string, params: Record<str
       ? params.layer
       : 'squad'
     const questions = parseDiscussionQuestions(params, explicitQuestion)
-    const participants = discussionPersonas(layer, typeof params.actor === 'string' ? params.actor : 'product-lead')
+    const participants = discussionPersonas(brain.path, layer, typeof params.actor === 'string' ? params.actor : 'product-lead')
       .map((id) => {
         const p = persona(id)
         return `${p.name} (${p.id}) · ${p.role} · voice=${p.voice} · concern=${p.concern}`
@@ -932,7 +985,11 @@ export function runV2McpCall(brainId: string, method: string, params: Record<str
         discussionPath,
         layer,
         questions,
-        typeof params.actor === 'string' ? params.actor : 'product-lead'
+        typeof params.actor === 'string' ? params.actor : 'product-lead',
+        participants.map((line) => {
+          const match = line.match(/\(([^)]+)\)/)
+          return match ? match[1] : 'project-operator'
+        })
       )
     }
     const event = lifecycleEvent(brainId, method, {
@@ -1066,7 +1123,7 @@ export function runV2McpCall(brainId: string, method: string, params: Record<str
         )
       } else {
         const newDiscussionTitle = `${String(current.title || 'Escalation')} (${escalationTarget} escalation)`
-        const participants = discussionPersonas(escalationTarget, escalationActor)
+        const participants = discussionPersonas(brain.path, escalationTarget, escalationActor)
           .map((id) => {
             const p = persona(id)
             return `${p.name} (${p.id}) · ${p.role} · voice=${p.voice} · concern=${p.concern}`
@@ -1109,7 +1166,10 @@ export function runV2McpCall(brainId: string, method: string, params: Record<str
         })
         const escalatedPath = findRecordPath(brain.path, 'discussions', escalated.id)
         if (escalatedPath) {
-          seedDiscussionThread(escalatedPath, escalationTarget, [escalationQuestion], escalationActor)
+          seedDiscussionThread(escalatedPath, escalationTarget, [escalationQuestion], escalationActor, participants.map((line) => {
+            const match = line.match(/\(([^)]+)\)/)
+            return match ? match[1] : 'project-operator'
+          }))
         }
         appendSectionLine(
           discussionPath,
