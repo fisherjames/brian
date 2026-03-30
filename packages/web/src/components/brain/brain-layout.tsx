@@ -50,9 +50,9 @@ interface BrainLayoutProps {
 
 const GRAPH_TAB: Tab = { id: 'graph', label: 'Graph + Notes' };
 const TEAM_TAB: Tab = { id: 'mission-control', label: 'Mission Control' };
-const TRIBE_TAB: Tab = { id: 'tribe-direction', label: 'Tribe' };
-const DIRECTORS_TAB: Tab = { id: 'directors', label: 'Directors' };
-const MISSION_TAB: Tab = { id: 'mission', label: 'CEO Mission' };
+const TRIBE_TAB: Tab = { id: 'tribe-direction', label: 'Tribe View' };
+const DIRECTORS_TAB: Tab = { id: 'directors', label: 'Director View' };
+const MISSION_TAB: Tab = { id: 'mission', label: 'CEO View' };
 const AGENTS_TAB: Tab = { id: 'agents-workflow', label: 'Agents + Workflow' };
 
 export function BrainLayout({
