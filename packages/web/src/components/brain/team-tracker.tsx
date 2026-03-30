@@ -460,11 +460,23 @@ export default function TeamTracker({
             </div>
           )}
 
-          <div className="mt-2 flex flex-wrap items-center gap-2">
+          <div className="mt-2 grid gap-2 sm:grid-cols-3">
+            <div className="rounded-md border border-border/70 bg-bg px-2 py-1.5 text-[11px] text-text-secondary">
+              Run: {runState && runActive ? `${runState.status} (${runState.actor ?? 'worker'})` : 'idle'}
+            </div>
+            <div className="rounded-md border border-border/70 bg-bg px-2 py-1.5 text-[11px] text-text-secondary">
+              Discussion loop: {observer?.active ? `on (ticks ${observer.ticks}, tasks ${observer.addedTasks})` : 'off'}
+            </div>
+            <div className="rounded-md border border-border/70 bg-bg px-2 py-1.5 text-[11px] text-text-secondary">
+              Last update: {lastUpdateAt ? new Date(lastUpdateAt).toLocaleTimeString('en-GB', { hour12: false }) : 'pending'}
+            </div>
+          </div>
+
+          <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
             <button
               onClick={() => apply('team.start_next_task', { squadId: activeSquadId }, 'start')}
               disabled={busy === 'start' || hardBlockers.length > 0 || !hasRunnableSuggestion || !connected}
-              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-bg px-2.5 py-1.5 text-[12px] text-text-secondary hover:bg-text/5 disabled:opacity-50"
+              className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md border border-border bg-bg px-3 py-2 text-[12px] text-text-secondary hover:bg-text/5 disabled:opacity-50"
             >
               <Play className="h-3.5 w-3.5" />
               Start Next Work
@@ -472,7 +484,7 @@ export default function TeamTracker({
             <button
               onClick={() => apply('team.pause_run', {}, 'pause')}
               disabled={busy === 'pause' || runState?.status !== 'running' || !connected}
-              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-bg px-2.5 py-1.5 text-[12px] text-text-secondary hover:bg-text/5 disabled:opacity-50"
+              className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md border border-border bg-bg px-3 py-2 text-[12px] text-text-secondary hover:bg-text/5 disabled:opacity-50"
             >
               <Pause className="h-3.5 w-3.5" />
               Pause
@@ -480,63 +492,56 @@ export default function TeamTracker({
             <button
               onClick={() => apply('team.get_conflict_summary', {}, 'conflicts')}
               disabled={busy === 'conflicts' || !repoState?.hasConflicts || !connected}
-              className="rounded-md border border-border bg-bg px-2.5 py-1.5 text-[12px] text-text-secondary hover:bg-text/5 disabled:opacity-50"
+              className="min-h-9 rounded-md border border-border bg-bg px-3 py-2 text-[12px] text-text-secondary hover:bg-text/5 disabled:opacity-50"
             >
               View Conflict
             </button>
             <button
               onClick={() => apply('team.merge_queue_dry_run', {}, 'merge-queue-dry')}
               disabled={busy === 'merge-queue-dry' || !connected}
-              className="rounded-md border border-border bg-bg px-2.5 py-1.5 text-[12px] text-text-secondary hover:bg-text/5 disabled:opacity-50"
+              className="min-h-9 rounded-md border border-border bg-bg px-3 py-2 text-[12px] text-text-secondary hover:bg-text/5 disabled:opacity-50"
             >
               Dry Run Queue
             </button>
             <button
               onClick={() => apply('team.merge_queue_execute', {}, 'merge-queue-exec')}
               disabled={busy === 'merge-queue-exec' || !connected || needsVerification || Boolean(repoState?.hasConflicts)}
-              className="rounded-md border border-border bg-bg px-2.5 py-1.5 text-[12px] text-text-secondary hover:bg-text/5 disabled:opacity-50"
+              className="min-h-9 rounded-md border border-border bg-bg px-3 py-2 text-[12px] text-text-secondary hover:bg-text/5 disabled:opacity-50"
             >
               Merge Worktrees
             </button>
             <button
               onClick={() => apply('team.cleanup_worktrees', {}, 'cleanup-wt')}
               disabled={busy === 'cleanup-wt' || !connected}
-              className="rounded-md border border-border bg-bg px-2.5 py-1.5 text-[12px] text-text-secondary hover:bg-text/5 disabled:opacity-50"
+              className="min-h-9 rounded-md border border-border bg-bg px-3 py-2 text-[12px] text-text-secondary hover:bg-text/5 disabled:opacity-50"
             >
               Cleanup Worktrees
             </button>
             <button
               onClick={() => apply('team.generate_handoff', {}, 'generate-handoff')}
               disabled={busy === 'generate-handoff' || !connected}
-              className="rounded-md border border-border bg-bg px-2.5 py-1.5 text-[12px] text-text-secondary hover:bg-text/5 disabled:opacity-50"
+              className="min-h-9 rounded-md border border-border bg-bg px-3 py-2 text-[12px] text-text-secondary hover:bg-text/5 disabled:opacity-50"
             >
               Generate Handoff
             </button>
             <button
               onClick={() => apply('team.cleanup_worktrees', { force: true }, 'cleanup-wt-force')}
               disabled={busy === 'cleanup-wt-force' || !connected}
-              className="rounded-md border border-border bg-bg px-2.5 py-1.5 text-[12px] text-text-secondary hover:bg-text/5 disabled:opacity-50"
+              className="min-h-9 rounded-md border border-border bg-bg px-3 py-2 text-[12px] text-text-secondary hover:bg-text/5 disabled:opacity-50"
             >
               Force Cleanup
             </button>
-            <span className="text-[12px] text-text-muted">Run state: {runState && runActive ? `${runState.status} (${runState.actor ?? 'worker'})` : 'idle'}</span>
-            <span className="text-[12px] text-text-muted">
-              Discussion loop: {observer?.active ? `on (ticks ${observer.ticks}, tasks ${observer.addedTasks})` : 'off'}
-            </span>
-            <span className="text-[12px] text-text-muted">
-              Last update: {lastUpdateAt ? new Date(lastUpdateAt).toLocaleTimeString('en-GB', { hour12: false }) : 'pending'}
-            </span>
             <button
               onClick={() => apply('team.observer_start', {}, 'observer-start')}
               disabled={busy === 'observer-start' || observer?.active || !connected}
-              className="rounded-md border border-border bg-bg px-2.5 py-1.5 text-[12px] text-text-secondary hover:bg-text/5 disabled:opacity-50"
+              className="min-h-9 rounded-md border border-border bg-bg px-3 py-2 text-[12px] text-text-secondary hover:bg-text/5 disabled:opacity-50"
             >
               Start Discussion Loop
             </button>
             <button
               onClick={() => apply('team.observer_stop', {}, 'observer-stop')}
               disabled={busy === 'observer-stop' || !observer?.active || !connected}
-              className="rounded-md border border-border bg-bg px-2.5 py-1.5 text-[12px] text-text-secondary hover:bg-text/5 disabled:opacity-50"
+              className="min-h-9 rounded-md border border-border bg-bg px-3 py-2 text-[12px] text-text-secondary hover:bg-text/5 disabled:opacity-50"
             >
               Stop Discussion Loop
             </button>
