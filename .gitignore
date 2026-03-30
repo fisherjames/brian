@@ -34,3 +34,10 @@ npm-debug.log*
 
 # Coverage
 coverage/
+
+# Brian local/runtime state
+.brian/
+
+# Playwright artifacts
+packages/web/test-results/
+packages/web/playwright-report/

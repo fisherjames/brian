@@ -3,8 +3,9 @@ import { test, expect } from '@playwright/test'
 test('UI actions emit expected MCP calls and persist initiative artifacts', async ({ page, request }) => {
   const brains = await request.get('/api/brains')
   expect(brains.ok()).toBeTruthy()
-  const brainsJson = await brains.json() as { userBrains?: Array<{ id: string; name: string }> }
-  const brian = (brainsJson.userBrains ?? []).find((item) => item.name === 'brian')
+  const brainsJson = await brains.json() as { userBrains?: Array<{ id: string; name: string; path?: string }> }
+  const brian = (brainsJson.userBrains ?? []).find((item) => item.path?.includes('/GitHub/brian'))
+    ?? (brainsJson.userBrains ?? []).find((item) => item.name.toLowerCase().includes('brian'))
   expect(brian).toBeTruthy()
 
   const calls: string[] = []
