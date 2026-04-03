@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import {
   Rocket,
   Play,
@@ -9,8 +9,13 @@ import {
   AlertTriangle,
   Loader2,
   Hand,
+  Square,
+  GitBranch,
+  Terminal,
+  Circle,
 } from 'lucide-react'
 import { useMcp } from '../../hooks/useMcp'
+import { useWebSocket } from '../../hooks/useWebSocket'
 
 type Phase = 'ready' | 'working' | 'verifying' | 'merging' | 'shipping' | 'done'
 
@@ -20,23 +25,85 @@ interface VerificationResult {
   output: string
 }
 
+interface TaskItem {
+  id: string
+  title: string
+  status: 'todo' | 'in_progress' | 'done'
+}
+
+interface RunState {
+  taskId: string
+  branch: string
+  status: 'idle' | 'running' | 'completed' | 'failed'
+  output: string[]
+}
+
 export function MissionControl({ brainId }: { brainId: string }) {
   const { call, connected } = useMcp()
+  const { subscribe } = useWebSocket()
   const [phase, setPhase] = useState<Phase>('ready')
   const [gateReady, setGateReady] = useState(false)
   const [verificationResults, setVerificationResults] = useState<VerificationResult[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [tasks, setTasks] = useState<TaskItem[]>([])
+  const [runState, setRunState] = useState<RunState>({
+    taskId: '',
+    branch: '',
+    status: 'idle',
+    output: [],
+  })
+  const outputRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    return subscribe((msg) => {
+      if (msg.type === 'agent.output' && typeof msg.line === 'string') {
+        setRunState((prev) => ({
+          ...prev,
+          output: [...prev.output, msg.line as string],
+        }))
+      }
+    })
+  }, [subscribe])
+
+  useEffect(() => {
+    if (outputRef.current) {
+      outputRef.current.scrollTop = outputRef.current.scrollHeight
+    }
+  }, [runState.output])
 
   useEffect(() => {
     if (!connected) return
     call<{ ready: boolean }>('team.get_live_demo_gate', {}, brainId)
       .then((r) => {
-        setGateReady(r.ready ?? false)
-        if (r.ready) setPhase('working')
+        if (r.ready) {
+          setGateReady(true)
+          setPhase('working')
+        }
+      })
+      .catch(() => {})
+
+    call<{ tasks: TaskItem[] }>('team.get_tasks', {}, brainId)
+      .then((r) => setTasks(r.tasks ?? []))
+      .catch(() => {})
+
+    call<RunState>('team.get_run_state', {}, brainId)
+      .then((r) => {
+        if (r.status === 'running') {
+          setRunState(r)
+          setGateReady(true)
+          setPhase('working')
+        }
       })
       .catch(() => {})
   }, [connected, call, brainId])
+
+  const refreshTasks = useCallback(async () => {
+    const r = await call<{ tasks: TaskItem[] }>('team.get_tasks', {}, brainId).catch(() => ({
+      tasks: [],
+    }))
+    setTasks(r.tasks ?? [])
+  }, [call, brainId])
 
   const handleReady = useCallback(async () => {
     setLoading(true)
@@ -46,7 +113,7 @@ export function MissionControl({ brainId }: { brainId: string }) {
       setGateReady(true)
       setPhase('working')
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to set gate')
+      setError(e instanceof Error ? e.message : 'Failed')
     } finally {
       setLoading(false)
     }
@@ -55,28 +122,53 @@ export function MissionControl({ brainId }: { brainId: string }) {
   const handleStartWork = useCallback(async () => {
     setLoading(true)
     setError(null)
+    setRunState((prev) => ({ ...prev, output: [], status: 'running' }))
     try {
-      await call('team.start_next_task', {}, brainId)
-      setPhase('verifying')
+      const result = await call<{
+        status: string
+        task: TaskItem
+        branch: string
+        agentStatus: string
+      }>('team.start_next_task', {}, brainId)
+      setRunState((prev) => ({
+        ...prev,
+        taskId: result.task?.id ?? '',
+        branch: result.branch ?? '',
+        status: 'running',
+      }))
+      await refreshTasks()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to start work')
+      setError(e instanceof Error ? e.message : 'Failed to start')
+      setRunState((prev) => ({ ...prev, status: 'failed' }))
     } finally {
       setLoading(false)
     }
+  }, [call, brainId, refreshTasks])
+
+  const handleStopWork = useCallback(async () => {
+    try {
+      await call('team.stop_task', {}, brainId)
+      setRunState((prev) => ({ ...prev, status: 'failed' }))
+    } catch {
+      /* ignore */
+    }
   }, [call, brainId])
+
+  const handleAdvanceToVerify = useCallback(() => {
+    setPhase('verifying')
+  }, [])
 
   const handleVerify = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const result = await call<{ gates: VerificationResult[] }>(
+      const result = await call<{ gates: VerificationResult[]; allPassed: boolean }>(
         'team.run_verification_suite',
         {},
         brainId,
       )
       setVerificationResults(result.gates ?? [])
-      const allPass = (result.gates ?? []).every((g) => g.ok)
-      if (allPass) setPhase('merging')
+      if (result.allPassed) setPhase('merging')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Verification failed')
     } finally {
@@ -88,14 +180,25 @@ export function MissionControl({ brainId }: { brainId: string }) {
     setLoading(true)
     setError(null)
     try {
+      const dryRun = await call<{ canMerge: boolean; conflicts: string[] }>(
+        'team.merge_queue_dry_run',
+        {},
+        brainId,
+      )
+      if (!dryRun.canMerge) {
+        setError(`Merge conflicts: ${dryRun.conflicts.join(', ')}`)
+        return
+      }
       await call('team.merge_queue_execute', {}, brainId)
+      await call('team.complete_task', {}, brainId)
+      await refreshTasks()
       setPhase('shipping')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Merge failed')
     } finally {
       setLoading(false)
     }
-  }, [call, brainId])
+  }, [call, brainId, refreshTasks])
 
   const handleShip = useCallback(async () => {
     setLoading(true)
@@ -110,34 +213,49 @@ export function MissionControl({ brainId }: { brainId: string }) {
     }
   }, [call, brainId])
 
+  const handleReset = useCallback(() => {
+    setPhase('working')
+    setRunState({ taskId: '', branch: '', status: 'idle', output: [] })
+    setVerificationResults([])
+    setError(null)
+    refreshTasks()
+  }, [refreshTasks])
+
   const phases: { id: Phase; label: string; icon: React.ReactNode }[] = [
-    { id: 'ready', label: 'Ready Gate', icon: <Hand className="h-5 w-5" /> },
-    { id: 'working', label: 'Start Work', icon: <Play className="h-5 w-5" /> },
-    { id: 'verifying', label: 'Verify', icon: <ShieldCheck className="h-5 w-5" /> },
-    { id: 'merging', label: 'Merge', icon: <GitMerge className="h-5 w-5" /> },
-    { id: 'shipping', label: 'Ship', icon: <Ship className="h-5 w-5" /> },
-    { id: 'done', label: 'Done', icon: <CheckCircle2 className="h-5 w-5" /> },
+    { id: 'ready', label: 'Ready', icon: <Hand className="h-4 w-4" /> },
+    { id: 'working', label: 'Execute', icon: <Play className="h-4 w-4" /> },
+    { id: 'verifying', label: 'Verify', icon: <ShieldCheck className="h-4 w-4" /> },
+    { id: 'merging', label: 'Merge', icon: <GitMerge className="h-4 w-4" /> },
+    { id: 'shipping', label: 'Ship', icon: <Ship className="h-4 w-4" /> },
+    { id: 'done', label: 'Done', icon: <CheckCircle2 className="h-4 w-4" /> },
   ]
 
   const phaseIndex = phases.findIndex((p) => p.id === phase)
 
   return (
-    <div className="p-6">
-      <div className="mb-6 flex items-center gap-3">
+    <div className="flex h-full flex-col p-6">
+      <div className="mb-4 flex items-center gap-3">
         <Rocket className="h-6 w-6 text-orange-400" />
         <h2 className="text-xl font-bold text-zinc-100">Mission Control</h2>
+        {runState.branch && (
+          <span className="flex items-center gap-1 rounded-full bg-violet-900/30 px-2 py-0.5 text-xs text-violet-300">
+            <GitBranch className="h-3 w-3" />
+            {runState.branch}
+          </span>
+        )}
         {!connected && (
-          <span className="ml-2 rounded-full bg-red-900/50 px-2 py-0.5 text-xs text-red-300">
+          <span className="rounded-full bg-red-900/50 px-2 py-0.5 text-xs text-red-300">
             Disconnected
           </span>
         )}
       </div>
 
-      <div className="mb-8 flex items-center gap-2 overflow-x-auto pb-2">
+      {/* Phase ribbon */}
+      <div className="mb-4 flex items-center gap-1 overflow-x-auto">
         {phases.map((p, i) => (
-          <div key={p.id} className="flex items-center gap-2">
+          <div key={p.id} className="flex items-center gap-1">
             <div
-              className={`flex items-center gap-2 rounded-lg border px-4 py-3 ${
+              className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium ${
                 i < phaseIndex
                   ? 'border-emerald-800 bg-emerald-900/20 text-emerald-400'
                   : i === phaseIndex
@@ -146,129 +264,219 @@ export function MissionControl({ brainId }: { brainId: string }) {
               }`}
             >
               {p.icon}
-              <span className="text-sm font-medium">{p.label}</span>
+              {p.label}
             </div>
-            {i < phases.length - 1 && <div className="h-px w-6 bg-zinc-800" />}
+            {i < phases.length - 1 && <div className="h-px w-4 bg-zinc-800" />}
           </div>
         ))}
       </div>
 
       {error && (
-        <div className="mb-4 flex items-center gap-2 rounded-lg border border-red-800 bg-red-900/20 p-3">
-          <AlertTriangle className="h-4 w-4 text-red-400" />
+        <div className="mb-3 flex items-center gap-2 rounded border border-red-800 bg-red-900/20 p-2">
+          <AlertTriangle className="h-4 w-4 shrink-0 text-red-400" />
           <span className="text-sm text-red-300">{error}</span>
         </div>
       )}
 
-      <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-6">
-        {phase === 'ready' && (
-          <div className="text-center">
-            <Hand className="mx-auto mb-4 h-12 w-12 text-amber-400" />
-            <h3 className="mb-2 text-lg font-semibold text-zinc-200">Ready to Begin?</h3>
-            <p className="mb-4 text-sm text-zinc-400">
-              Click when ready to start the mission workflow.
-            </p>
-            <button
-              onClick={handleReady}
-              disabled={loading}
-              className="rounded-lg bg-blue-600 px-6 py-2 font-medium text-white transition hover:bg-blue-500 disabled:opacity-50"
-            >
-              {loading ? <Loader2 className="mx-auto h-5 w-5 animate-spin" /> : "I'm Ready"}
-            </button>
-          </div>
-        )}
-
-        {phase === 'working' && (
-          <div className="text-center">
-            <Play className="mx-auto mb-4 h-12 w-12 text-blue-400" />
-            <h3 className="mb-2 text-lg font-semibold text-zinc-200">Start Work</h3>
-            <p className="mb-4 text-sm text-zinc-400">Begin executing the next task.</p>
-            <button
-              onClick={handleStartWork}
-              disabled={loading}
-              className="rounded-lg bg-blue-600 px-6 py-2 font-medium text-white transition hover:bg-blue-500 disabled:opacity-50"
-            >
-              {loading ? <Loader2 className="mx-auto h-5 w-5 animate-spin" /> : 'Start Next Work'}
-            </button>
-          </div>
-        )}
-
-        {phase === 'verifying' && (
-          <div>
-            <div className="mb-4 text-center">
-              <ShieldCheck className="mx-auto mb-4 h-12 w-12 text-violet-400" />
-              <h3 className="mb-2 text-lg font-semibold text-zinc-200">Run Verification</h3>
-            </div>
-            {verificationResults.length > 0 && (
-              <div className="mb-4 space-y-2">
-                {verificationResults.map((r) => (
-                  <div
-                    key={r.name}
-                    className="flex items-center gap-2 rounded border border-zinc-800 p-2"
+      <div className="flex min-h-0 flex-1 gap-4">
+        {/* Left: tasks + controls */}
+        <div className="flex w-72 shrink-0 flex-col gap-3">
+          <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+            <h3 className="mb-3 text-sm font-semibold text-zinc-300">Execution Plan</h3>
+            <div className="space-y-1.5">
+              {tasks.map((t) => (
+                <div key={t.id} className="flex items-center gap-2 text-sm">
+                  {t.status === 'done' ? (
+                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
+                  ) : t.status === 'in_progress' || t.id === runState.taskId ? (
+                    <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-blue-400" />
+                  ) : (
+                    <Circle className="h-3.5 w-3.5 shrink-0 text-zinc-600" />
+                  )}
+                  <span
+                    className={
+                      t.status === 'done'
+                        ? 'text-zinc-500 line-through'
+                        : t.id === runState.taskId
+                          ? 'text-blue-300'
+                          : 'text-zinc-300'
+                    }
                   >
-                    {r.ok ? (
-                      <CheckCircle2 className="h-4 w-4 text-emerald-400" />
-                    ) : (
-                      <AlertTriangle className="h-4 w-4 text-red-400" />
-                    )}
-                    <span className="text-sm text-zinc-300">{r.name}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div className="text-center">
+                    {t.title}
+                  </span>
+                </div>
+              ))}
+              {tasks.length === 0 && (
+                <p className="text-xs text-zinc-600">No tasks in execution plan.</p>
+              )}
+            </div>
+          </div>
+
+          {/* Action panel */}
+          <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+            {phase === 'ready' && (
               <button
-                onClick={handleVerify}
+                onClick={handleReady}
                 disabled={loading}
-                className="rounded-lg bg-violet-600 px-6 py-2 font-medium text-white transition hover:bg-violet-500 disabled:opacity-50"
+                className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50"
+              >
+                {loading ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : "I'm Ready"}
+              </button>
+            )}
+
+            {phase === 'working' && runState.status === 'idle' && (
+              <button
+                onClick={handleStartWork}
+                disabled={loading || tasks.filter((t) => t.status === 'todo').length === 0}
+                className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50"
               >
                 {loading ? (
-                  <Loader2 className="mx-auto h-5 w-5 animate-spin" />
+                  <Loader2 className="mx-auto h-4 w-4 animate-spin" />
                 ) : (
-                  'Run Verification Suite'
+                  'Start Next Task'
                 )}
               </button>
-            </div>
-          </div>
-        )}
+            )}
 
-        {phase === 'merging' && (
-          <div className="text-center">
-            <GitMerge className="mx-auto mb-4 h-12 w-12 text-cyan-400" />
-            <h3 className="mb-2 text-lg font-semibold text-zinc-200">Merge</h3>
-            <p className="mb-4 text-sm text-zinc-400">All gates passed. Ready to merge.</p>
-            <button
-              onClick={handleMerge}
-              disabled={loading}
-              className="rounded-lg bg-cyan-600 px-6 py-2 font-medium text-white transition hover:bg-cyan-500 disabled:opacity-50"
-            >
-              {loading ? <Loader2 className="mx-auto h-5 w-5 animate-spin" /> : 'Execute Merge'}
-            </button>
-          </div>
-        )}
+            {phase === 'working' && runState.status === 'running' && (
+              <button
+                onClick={handleStopWork}
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-500"
+              >
+                <Square className="h-4 w-4" />
+                Stop Agent
+              </button>
+            )}
 
-        {phase === 'shipping' && (
-          <div className="text-center">
-            <Ship className="mx-auto mb-4 h-12 w-12 text-orange-400" />
-            <h3 className="mb-2 text-lg font-semibold text-zinc-200">Ship</h3>
-            <p className="mb-4 text-sm text-zinc-400">Push merged changes to main.</p>
-            <button
-              onClick={handleShip}
-              disabled={loading}
-              className="rounded-lg bg-orange-600 px-6 py-2 font-medium text-white transition hover:bg-orange-500 disabled:opacity-50"
-            >
-              {loading ? <Loader2 className="mx-auto h-5 w-5 animate-spin" /> : 'Ship to Main'}
-            </button>
-          </div>
-        )}
+            {phase === 'working' &&
+              (runState.status === 'completed' || runState.status === 'failed') && (
+                <div className="space-y-2">
+                  <div
+                    className={`rounded p-2 text-center text-sm font-medium ${
+                      runState.status === 'completed'
+                        ? 'bg-emerald-900/30 text-emerald-300'
+                        : 'bg-red-900/30 text-red-300'
+                    }`}
+                  >
+                    Agent {runState.status}
+                  </div>
+                  <button
+                    onClick={handleAdvanceToVerify}
+                    className="w-full rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-500"
+                  >
+                    Run Verification
+                  </button>
+                </div>
+              )}
 
-        {phase === 'done' && (
-          <div className="text-center">
-            <CheckCircle2 className="mx-auto mb-4 h-12 w-12 text-emerald-400" />
-            <h3 className="mb-2 text-lg font-semibold text-zinc-200">Mission Complete</h3>
-            <p className="text-sm text-zinc-400">Changes have been shipped to main.</p>
+            {phase === 'verifying' && (
+              <div className="space-y-2">
+                {verificationResults.length > 0 && (
+                  <div className="space-y-1">
+                    {verificationResults.map((r) => (
+                      <div
+                        key={r.name}
+                        className="flex items-center gap-2 rounded border border-zinc-800 p-1.5 text-xs"
+                      >
+                        {r.ok ? (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                        ) : (
+                          <AlertTriangle className="h-3.5 w-3.5 text-red-400" />
+                        )}
+                        <span className="text-zinc-300">{r.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <button
+                  onClick={handleVerify}
+                  disabled={loading}
+                  className="w-full rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-500 disabled:opacity-50"
+                >
+                  {loading ? (
+                    <Loader2 className="mx-auto h-4 w-4 animate-spin" />
+                  ) : (
+                    'Run Verification Suite'
+                  )}
+                </button>
+              </div>
+            )}
+
+            {phase === 'merging' && (
+              <button
+                onClick={handleMerge}
+                disabled={loading}
+                className="w-full rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-500 disabled:opacity-50"
+              >
+                {loading ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : 'Merge to v2'}
+              </button>
+            )}
+
+            {phase === 'shipping' && (
+              <button
+                onClick={handleShip}
+                disabled={loading}
+                className="w-full rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-500 disabled:opacity-50"
+              >
+                {loading ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : 'Push to Remote'}
+              </button>
+            )}
+
+            {phase === 'done' && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-center gap-2 rounded bg-emerald-900/30 p-2 text-sm text-emerald-300">
+                  <CheckCircle2 className="h-4 w-4" />
+                  Shipped
+                </div>
+                <button
+                  onClick={handleReset}
+                  className="w-full rounded-lg bg-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:bg-zinc-600"
+                >
+                  Next Task
+                </button>
+              </div>
+            )}
           </div>
-        )}
+        </div>
+
+        {/* Right: agent output terminal */}
+        <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-zinc-800 bg-zinc-950">
+          <div className="flex items-center gap-2 border-b border-zinc-800 px-4 py-2">
+            <Terminal className="h-4 w-4 text-zinc-500" />
+            <span className="text-sm font-medium text-zinc-400">Agent Output</span>
+            {runState.status === 'running' && (
+              <span className="ml-auto flex items-center gap-1 text-xs text-blue-400">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Running
+              </span>
+            )}
+          </div>
+          <div
+            ref={outputRef}
+            className="flex-1 overflow-auto p-4 font-mono text-xs leading-5 text-zinc-400"
+          >
+            {runState.output.length === 0 ? (
+              <p className="text-zinc-600">
+                Agent output will appear here when a task is started...
+              </p>
+            ) : (
+              runState.output.map((line, i) => (
+                <div
+                  key={i}
+                  className={
+                    line.startsWith('[engine]')
+                      ? 'text-blue-400'
+                      : line.startsWith('[stderr]')
+                        ? 'text-red-400'
+                        : 'text-zinc-300'
+                  }
+                >
+                  {line}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
       </div>
     </div>
   )

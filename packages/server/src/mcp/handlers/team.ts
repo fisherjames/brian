@@ -13,6 +13,14 @@ import {
 import { checkPolicyForStage } from '../../governance/policy-registry.js'
 import { BrainFs } from '../../fs/brain-fs.js'
 import { SquadsStore } from '../../fs/squads-store.js'
+import { parseExecutionPlan } from '../../engine/task-parser.js'
+import {
+  startNextTask,
+  stopCurrentTask,
+  completeCurrentTask,
+  getExecutionState,
+} from '../../engine/executor.js'
+import { getRunState, onAgentOutput } from '../../engine/agent-runner.js'
 
 type McpHandler = (
   params: Record<string, unknown>,
@@ -25,7 +33,9 @@ let liveDemoGateReady = false
 export const teamHandlers: Record<string, McpHandler> = {
   'team.get_snapshot': async (_params, brainRoot, brainId) => {
     const fs = new BrainFs(brainRoot)
-    return fs.getSnapshot(brainId ?? '')
+    const snapshot = fs.getSnapshot(brainId ?? '')
+    const state = getExecutionState(brainRoot)
+    return { ...snapshot, executionState: state }
   },
 
   'team.get_squads': async (_params, brainRoot) => {
@@ -61,8 +71,41 @@ export const teamHandlers: Record<string, McpHandler> = {
     return { ready: liveDemoGateReady }
   },
 
+  'team.get_tasks': async (_params, brainRoot) => {
+    const tasks = parseExecutionPlan(brainRoot)
+    return { tasks }
+  },
+
+  'team.get_execution_state': async (_params, brainRoot) => {
+    return getExecutionState(brainRoot)
+  },
+
+  'team.get_run_state': async () => {
+    return getRunState()
+  },
+
   'team.start_next_task': async (_params, brainRoot) => {
-    return { status: 'ok', message: 'Task started' }
+    const state = startNextTask(brainRoot)
+    return {
+      status: 'started',
+      task: state.currentTask,
+      branch: state.branch,
+      agentStatus: state.agentStatus,
+    }
+  },
+
+  'team.stop_task': async () => {
+    stopCurrentTask()
+    return { status: 'stopped' }
+  },
+
+  'team.complete_task': async (_params, brainRoot) => {
+    completeCurrentTask(brainRoot)
+    return { status: 'completed' }
+  },
+
+  'team.subscribe_output': async () => {
+    return { status: 'ok', message: 'Use WebSocket for real-time output' }
   },
 
   'team.run_verification_suite': async (_params, brainRoot) => {
@@ -105,18 +148,19 @@ export const teamHandlers: Record<string, McpHandler> = {
 
   'team.merge_queue_dry_run': async (_params, brainRoot) => {
     const branch = getCurrentBranch(brainRoot)
-    if (branch === 'main') return { canMerge: true, conflicts: [], branch }
+    if (branch === 'main' || branch === 'v2') return { canMerge: true, conflicts: [], branch }
     return { branch, ...dryRunMerge(brainRoot, branch) }
   },
 
   'team.merge_queue_execute': async (_params, brainRoot) => {
     const branch = getCurrentBranch(brainRoot)
-    if (branch === 'main') return { ok: true, message: 'Already on main' }
-    return executeMerge(brainRoot, branch)
+    const target = 'v2'
+    if (branch === target) return { ok: true, message: `Already on ${target}` }
+    return executeMerge(brainRoot, branch, target)
   },
 
   'team.merge_queue_ship': async (_params, brainRoot) => {
-    return pushToRemote(brainRoot)
+    return pushToRemote(brainRoot, 'v2')
   },
 
   'team.create_mission_branch': async (params, brainRoot) => {
