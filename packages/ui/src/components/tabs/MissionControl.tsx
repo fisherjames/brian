@@ -13,11 +13,13 @@ import {
   GitBranch,
   Terminal,
   Circle,
+  Send,
+  Sparkles,
 } from 'lucide-react'
 import { useMcp } from '../../hooks/useMcp'
 import { useWebSocket } from '../../hooks/useWebSocket'
 
-type Phase = 'ready' | 'working' | 'verifying' | 'merging' | 'shipping' | 'done'
+type Phase = 'idle' | 'ready' | 'working' | 'verifying' | 'merging' | 'shipping' | 'done'
 
 interface VerificationResult {
   name: string
@@ -41,8 +43,9 @@ interface RunState {
 export function MissionControl({ brainId }: { brainId: string }) {
   const { call, connected } = useMcp()
   const { subscribe } = useWebSocket()
-  const [phase, setPhase] = useState<Phase>('ready')
-  const [gateReady, setGateReady] = useState(false)
+  const [phase, setPhase] = useState<Phase>('idle')
+  const [intentText, setIntentText] = useState('')
+  const [submittingIntent, setSubmittingIntent] = useState(false)
   const [verificationResults, setVerificationResults] = useState<VerificationResult[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -72,45 +75,57 @@ export function MissionControl({ brainId }: { brainId: string }) {
     }
   }, [runState.output])
 
-  useEffect(() => {
-    if (!connected) return
-    call<{ ready: boolean }>('team.get_live_demo_gate', {}, brainId)
-      .then((r) => {
-        if (r.ready) {
-          setGateReady(true)
-          setPhase('working')
-        }
-      })
-      .catch(() => {})
-
-    call<{ tasks: TaskItem[] }>('team.get_tasks', {}, brainId)
-      .then((r) => setTasks(r.tasks ?? []))
-      .catch(() => {})
-
-    call<RunState>('team.get_run_state', {}, brainId)
-      .then((r) => {
-        if (r.status === 'running') {
-          setRunState(r)
-          setGateReady(true)
-          setPhase('working')
-        }
-      })
-      .catch(() => {})
-  }, [connected, call, brainId])
-
   const refreshTasks = useCallback(async () => {
     const r = await call<{ tasks: TaskItem[] }>('team.get_tasks', {}, brainId).catch(() => ({
       tasks: [],
     }))
     setTasks(r.tasks ?? [])
+    return r.tasks ?? []
   }, [call, brainId])
+
+  useEffect(() => {
+    if (!connected) return
+
+    refreshTasks().then((loadedTasks) => {
+      const hasTodo = loadedTasks.some((t) => t.status === 'todo')
+      if (hasTodo) setPhase('ready')
+    })
+
+    call<RunState>('team.get_run_state', {}, brainId)
+      .then((r) => {
+        if (r.status === 'running') {
+          setRunState(r)
+          setPhase('working')
+        }
+      })
+      .catch(() => {})
+  }, [connected, call, brainId, refreshTasks])
+
+  const handleSubmitIntent = useCallback(async () => {
+    if (!intentText.trim()) return
+    setSubmittingIntent(true)
+    setError(null)
+    try {
+      await call<{ status: string; intentId: string }>(
+        'company.intent.capture',
+        { description: intentText.trim() },
+        brainId,
+      )
+      setIntentText('')
+      await refreshTasks()
+      setPhase('ready')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to capture intent')
+    } finally {
+      setSubmittingIntent(false)
+    }
+  }, [call, brainId, intentText, refreshTasks])
 
   const handleReady = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
       await call('team.set_live_demo_gate', { ready: true }, brainId)
-      setGateReady(true)
       setPhase('working')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed')
@@ -213,15 +228,17 @@ export function MissionControl({ brainId }: { brainId: string }) {
     }
   }, [call, brainId])
 
-  const handleReset = useCallback(() => {
-    setPhase('working')
+  const handleReset = useCallback(async () => {
     setRunState({ taskId: '', branch: '', status: 'idle', output: [] })
     setVerificationResults([])
     setError(null)
-    refreshTasks()
+    const updated = await refreshTasks()
+    const hasTodo = updated.some((t) => t.status === 'todo')
+    setPhase(hasTodo ? 'ready' : 'idle')
   }, [refreshTasks])
 
   const phases: { id: Phase; label: string; icon: React.ReactNode }[] = [
+    { id: 'idle', label: 'Intent', icon: <Sparkles className="h-4 w-4" /> },
     { id: 'ready', label: 'Ready', icon: <Hand className="h-4 w-4" /> },
     { id: 'working', label: 'Execute', icon: <Play className="h-4 w-4" /> },
     { id: 'verifying', label: 'Verify', icon: <ShieldCheck className="h-4 w-4" /> },
@@ -235,7 +252,7 @@ export function MissionControl({ brainId }: { brainId: string }) {
   return (
     <div className="flex h-full flex-col p-6">
       <div className="mb-4 flex items-center gap-3">
-        <Rocket className="h-6 w-6 text-orange-400" />
+        <Rocket className="h-6 w-6 text-emerald-400" />
         <h2 className="text-xl font-bold text-zinc-100">Mission Control</h2>
         {runState.branch && (
           <span className="flex items-center gap-1 rounded-full bg-violet-900/30 px-2 py-0.5 text-xs text-violet-300">
@@ -312,12 +329,49 @@ export function MissionControl({ brainId }: { brainId: string }) {
             </div>
           </div>
 
+          {/* Intent input */}
+          <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+            <h3 className="mb-2 text-sm font-semibold text-zinc-300">New Intent</h3>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={intentText}
+                onChange={(e) => setIntentText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    handleSubmitIntent()
+                  }
+                }}
+                placeholder="Describe what you want built..."
+                className="flex-1 rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-500 outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
+              />
+              <button
+                onClick={handleSubmitIntent}
+                disabled={submittingIntent || !intentText.trim()}
+                className="flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50"
+              >
+                {submittingIntent ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+              </button>
+            </div>
+          </div>
+
           {/* Action panel */}
           <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+            {phase === 'idle' && (
+              <p className="text-center text-sm text-zinc-500">
+                Enter an intent above to generate tasks.
+              </p>
+            )}
+
             {phase === 'ready' && (
               <button
                 onClick={handleReady}
-                disabled={loading}
+                disabled={loading || tasks.filter((t) => t.status === 'todo').length === 0}
                 className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50"
               >
                 {loading ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : "I'm Ready"}
@@ -408,7 +462,11 @@ export function MissionControl({ brainId }: { brainId: string }) {
                 disabled={loading}
                 className="w-full rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-500 disabled:opacity-50"
               >
-                {loading ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : 'Merge to v2'}
+                {loading ? (
+                  <Loader2 className="mx-auto h-4 w-4 animate-spin" />
+                ) : (
+                  'Merge to Main'
+                )}
               </button>
             )}
 
