@@ -93,7 +93,10 @@ export default function AgentsWorkflow({ brainId }: { brainId: string }) {
 
   const loadCodexRules = useCallback(async (): Promise<string> => {
     const res = await fetch('/api/codex-rules', { cache: 'no-store' })
-    if (res.ok) return await res.text()
+    if (res.ok) {
+      const json = (await res.json()) as { content?: string }
+      return typeof json.content === 'string' ? json.content : ''
+    }
     throw new Error('failed_to_load_rules')
   }, [])
 

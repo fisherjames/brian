@@ -44,6 +44,11 @@ Brian is a delegated company operating system in markdown.
 - Commit messages include explicit breaking-change callout.
 - User-visible changes include before/after evidence note where feasible.
 - Human verification is required before merge.
+- Verification suite must pass full gate set: format, lint, typecheck, unit, integration, e2e.
+- E2E retries once only; non-E2E failures block immediately.
+- New user-visible features require at least one new e2e test.
+- Failed verification must capture observability evidence and auto-create remediation `NEXT`.
+- Ship requires policy checks for MCP methods, codex skills, and codex rules.
 
 ## Interaction Output Contract
 - every interaction must emit one of: `question`, `decision`, `handoff`, `task_update`, `verification_record`, or `briefing`.

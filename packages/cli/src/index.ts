@@ -2203,6 +2203,8 @@ function runDoctrineLint(brainRoot: string): { ok: boolean; issues: string[] } {
   const initiativesDir = path.join(brainRoot, 'brian', 'initiatives')
   const discussionsDir = path.join(brainRoot, 'brian', 'discussions')
   const decisionsDir = path.join(brainRoot, 'brian', 'decisions')
+  const policyPackPath = path.join(brainRoot, '.brian', 'policy-pack.json')
+  const verificationLogPath = path.join(brainRoot, '.brian', 'verification-runs.ndjson')
 
   const pipelineContract = 'intent -> director discussion -> director decision proposal -> CEO reviews proposal PDF -> CEO approves proposal PDF -> tribe shaping -> squad planning -> execution -> verification -> merge -> briefing'
   const agentsContent = fs.existsSync(agentsPath) ? fs.readFileSync(agentsPath, 'utf8') : ''
@@ -2216,6 +2218,12 @@ function runDoctrineLint(brainRoot: string): { ok: boolean; issues: string[] } {
   }
   if (!constitutionContent.toLowerCase().includes('markdown')) {
     issues.push('constitution.md should explicitly assert markdown-first doctrine.')
+  }
+  if (!fs.existsSync(policyPackPath)) {
+    issues.push('.brian/policy-pack.json is missing.')
+  }
+  if (!fs.existsSync(verificationLogPath)) {
+    issues.push('.brian/verification-runs.ndjson is missing (initialize verification harness).')
   }
 
   if (!fs.existsSync(initiativesDir)) {

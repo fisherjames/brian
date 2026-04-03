@@ -4,8 +4,13 @@ import { readCodexRules, writeCodexRules } from '@/lib/local-data'
 export async function GET() {
   try {
     const content = readCodexRules()
-    return new NextResponse(content, {
-      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+    const required = ['default.rules']
+    const hasDefault = content.trim().length > 0
+    return NextResponse.json({
+      content,
+      requiredRules: required,
+      missing: hasDefault ? [] : required,
+      ok: hasDefault,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to read rules'

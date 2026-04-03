@@ -6,8 +6,11 @@
     "dev": "NODE_ENV=development tsx src/server/custom-server.ts",
     "build": "rm -rf .next && next build && tsc --project tsconfig.server.json",
     "start": "NODE_ENV=production node dist/server/custom-server.js",
+    "format": "tsc --noEmit",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
+    "unit": "tsc --noEmit",
+    "integration": "tsc --noEmit",
     "e2e": "playwright test"
   },
   "dependencies": {

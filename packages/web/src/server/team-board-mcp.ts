@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process'
 import { getBrain, getExecutionSteps, getHandoffs, scanBrainFiles } from '../lib/local-data'
 import { isExecutionPlanFile } from '../lib/execution-plan-parser'
 import { readV2Models } from '../lib/v2/projection'
+import { captureFailureBundle, latestVerificationRun, policyStatus, runVerificationSuite } from './mission-governance'
 
 type StepStatus = 'not_started' | 'in_progress' | 'completed' | 'blocked'
 
@@ -71,6 +72,31 @@ type McpResult = {
     ready: boolean
     acknowledgedAt: string | null
     actor: string | null
+  }
+  policy?: {
+    ok: boolean
+    missingMcpMethods: string[]
+    missingSkills: string[]
+    missingRules: string[]
+    version: number
+  }
+  verification?: {
+    id: string
+    at: string
+    ok: boolean
+    touchedCoveragePct: number
+    e2eFeatures: string[]
+    gates: Array<{ name: string; ok: boolean; retried: boolean }>
+  }
+  failureBundle?: {
+    id: string
+    at: string
+    reason: string
+    actor: string
+    runId?: string
+    stage: string
+    branch: string
+    details: string
   }
 }
 
@@ -940,6 +966,91 @@ export function runTeamMcpCall(
     }
   }
 
+  if (method === 'team.get_policy_status') {
+    const methods = [
+      'team.set_live_demo_gate',
+      'team.start_next_task',
+      'team.run_verification_suite',
+      'team.record_human_verification',
+      'team.reject_human_verification',
+      'team.merge_queue_dry_run',
+      'team.merge_queue_execute',
+      'team.merge_queue_ship',
+      'team.capture_failure_bundle',
+    ]
+    const status = policyStatus(brainPath, methods)
+    fs.mkdirSync(path.join(brainPath, '.brian'), { recursive: true })
+    const verificationLogPath = path.join(brainPath, '.brian', 'verification-runs.ndjson')
+    if (!fs.existsSync(verificationLogPath)) fs.writeFileSync(verificationLogPath, '', 'utf8')
+    return {
+      message: status.ok ? 'policy_status:ok' : 'policy_status:blocked',
+      snapshot: snapshotForBrain(brainPath),
+      policy: {
+        ok: status.ok,
+        missingMcpMethods: status.missingMcpMethods,
+        missingSkills: status.missingSkills,
+        missingRules: status.missingRules,
+        version: status.policy.version,
+      },
+    }
+  }
+
+  if (method === 'team.run_verification_suite') {
+    const feature = String(params.feature ?? '').trim()
+    const status = policyStatus(brainPath, [
+      'team.set_live_demo_gate',
+      'team.start_next_task',
+      'team.run_verification_suite',
+      'team.record_human_verification',
+      'team.reject_human_verification',
+      'team.merge_queue_dry_run',
+      'team.merge_queue_execute',
+      'team.merge_queue_ship',
+      'team.capture_failure_bundle',
+    ])
+    if (!status.ok) {
+      return {
+        message: 'verification_suite:blocked:policy_requirements_missing',
+        snapshot: snapshotForBrain(brainPath),
+        policy: {
+          ok: false,
+          missingMcpMethods: status.missingMcpMethods,
+          missingSkills: status.missingSkills,
+          missingRules: status.missingRules,
+          version: status.policy.version,
+        },
+      }
+    }
+    const run = runVerificationSuite(brainPath, process.cwd(), feature)
+    return {
+      message: run.ok ? `verification_suite:passed:${run.id}` : `verification_suite:failed:${run.id}`,
+      snapshot: snapshotForBrain(brainPath),
+      verification: {
+        id: run.id,
+        at: run.at,
+        ok: run.ok,
+        touchedCoveragePct: run.touchedCoveragePct,
+        e2eFeatures: run.e2eFeatures,
+        gates: run.gates.map((gate) => ({ name: gate.name, ok: gate.ok, retried: gate.retried })),
+      },
+    }
+  }
+
+  if (method === 'team.capture_failure_bundle') {
+    const actor = String(params.actor ?? 'project-operator')
+    const reason = String(params.reason ?? '').trim() || 'unspecified_failure'
+    const stage = String(params.stage ?? 'execution')
+    const details = String(params.details ?? '').trim() || reason
+    const branch = gitRepoState(brainPath).branch
+    const runId = typeof params.runId === 'string' && params.runId.trim() ? params.runId.trim() : undefined
+    const bundle = captureFailureBundle(brainPath, { actor, reason, stage, details, branch, runId })
+    return {
+      message: `failure_bundle_captured:${bundle.id}`,
+      snapshot: snapshotForBrain(brainPath),
+      failureBundle: bundle,
+    }
+  }
+
   if (method === 'team.get_repo_state') {
     return { message: 'repo_state_loaded', snapshot: snapshotForBrain(brainPath), repo: gitRepoState(brainPath) }
   }
@@ -1033,6 +1144,33 @@ export function runTeamMcpCall(
         liveDemoGate: gate,
       }
     }
+    const verificationRun = latestVerificationRun(brainPath)
+    if (!verificationRun || !verificationRun.ok) {
+      return {
+        message: 'verification_blocked:verification_suite_not_green',
+        snapshot: snapshotForBrain(brainPath),
+        verification: verificationRun ? {
+          id: verificationRun.id,
+          at: verificationRun.at,
+          ok: verificationRun.ok,
+          touchedCoveragePct: verificationRun.touchedCoveragePct,
+          e2eFeatures: verificationRun.e2eFeatures,
+          gates: verificationRun.gates.map((gate) => ({ name: gate.name, ok: gate.ok, retried: gate.retried })),
+        } : undefined,
+      }
+    }
+    if (verificationRun.touchedCoveragePct < 100) {
+      return {
+        message: 'verification_blocked:coverage_not_100',
+        snapshot: snapshotForBrain(brainPath),
+      }
+    }
+    if (verificationRun.e2eFeatures.length === 0) {
+      return {
+        message: 'verification_blocked:e2e_feature_evidence_missing',
+        snapshot: snapshotForBrain(brainPath),
+      }
+    }
     const current = snapshotForBrain(brainPath)
     const fallbackStepId =
       current.executionSteps.find((s) => s.phase_number === 99)?.id ??
@@ -1071,12 +1209,24 @@ export function runTeamMcpCall(
       ? `BLOCKER: Human rejected feature "${feature}" at verification gate: ${reason}`
       : `BLOCKER: Human rejected verification at gate: ${reason}`
     mutateStepFile(brainPath, { stepId, appendTaskText: blockerText })
+    mutateStepFile(
+      brainPath,
+      { stepId, appendTaskText: `NEXT: remediation="${reason}" lane=bugfix_observer worktree=feature/remediate-${slugify(reason)} image=pending breaking=none` }
+    )
     mutateStepFile(brainPath, { stepId, status: 'blocked' })
+    const bundle = captureFailureBundle(brainPath, {
+      actor: 'human-operator',
+      reason,
+      stage: 'verification',
+      branch: gitRepoState(brainPath).branch,
+      details: feature ? `Verification rejected for feature "${feature}"` : 'Verification rejected',
+    })
     const nextGate = writeLiveDemoGateState(brainPath, { ready: false, acknowledgedAt: null, actor: null })
     return {
       message: `human_verification_rejected:${stepId}`,
       snapshot: snapshotForBrain(brainPath),
       liveDemoGate: nextGate,
+      failureBundle: bundle,
     }
   }
 
@@ -1353,6 +1503,31 @@ export function runTeamMcpCall(
 
   if (method === 'team.merge_queue_ship') {
     const current = snapshotForBrain(brainPath)
+    const policy = policyStatus(brainPath, [
+      'team.set_live_demo_gate',
+      'team.start_next_task',
+      'team.run_verification_suite',
+      'team.record_human_verification',
+      'team.reject_human_verification',
+      'team.merge_queue_dry_run',
+      'team.merge_queue_execute',
+      'team.merge_queue_ship',
+      'team.capture_failure_bundle',
+    ])
+    if (!policy.ok) {
+      return {
+        message: 'ship_blocked:policy_requirements_missing',
+        snapshot: current,
+        repo: gitRepoState(brainPath),
+        policy: {
+          ok: false,
+          missingMcpMethods: policy.missingMcpMethods,
+          missingSkills: policy.missingSkills,
+          missingRules: policy.missingRules,
+          version: policy.policy.version,
+        },
+      }
+    }
     const initiativeContext = resolveActiveInitiativeContext(brainId, brainPath, current)
     if (!initiativeContext) {
       return {

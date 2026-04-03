@@ -79,6 +79,31 @@ type SnapshotResult = {
     acknowledgedAt: string | null
     actor: string | null
   }
+  policy?: {
+    ok: boolean
+    missingMcpMethods: string[]
+    missingSkills: string[]
+    missingRules: string[]
+    version: number
+  }
+  verification?: {
+    id: string
+    at: string
+    ok: boolean
+    touchedCoveragePct: number
+    e2eFeatures: string[]
+    gates: Array<{ name: string; ok: boolean; retried: boolean }>
+  }
+  failureBundle?: {
+    id: string
+    at: string
+    reason: string
+    actor: string
+    runId?: string
+    stage: string
+    branch: string
+    details: string
+  }
   observer?: {
     active: boolean
     ticks: number
@@ -147,6 +172,9 @@ export default function TeamTracker({
   const [shipSummaryText, setShipSummaryText] = useState('')
   const [dryRunBlocked, setDryRunBlocked] = useState(false)
   const [dryRunReason, setDryRunReason] = useState('')
+  const [policySummary, setPolicySummary] = useState('')
+  const [verificationSummary, setVerificationSummary] = useState('')
+  const [failureBundleSummary, setFailureBundleSummary] = useState('')
   const [liveDemoGate, setLiveDemoGate] = useState<{ ready: boolean; acknowledgedAt: string | null; actor: string | null }>({
     ready: false,
     acknowledgedAt: null,
@@ -172,7 +200,7 @@ export default function TeamTracker({
 
   useEffect(() => {
     const refreshRuntimeState = async () => {
-      const [snapshotRes, runRes, repoRes, suggestionRes, squadsRes, dryRunRes, gateRes] = await Promise.all([
+      const [snapshotRes, runRes, repoRes, suggestionRes, squadsRes, dryRunRes, gateRes, policyRes] = await Promise.all([
         call<{ snapshot: SnapshotResult['snapshot'] }>('team.get_snapshot'),
         call<{ run: SnapshotResult['run']; active: boolean; observer?: SnapshotResult['observer'] }>('team.get_run_state'),
         call<{ repo: RepoState }>('team.get_repo_state'),
@@ -180,6 +208,7 @@ export default function TeamTracker({
         call<{ squads: Array<{ id: string; name: string; memberAgentIds: string[] }>; activeSquadId: string; agentCatalog: Array<{ id: string; label: string }> }>('team.get_squads'),
         call<SnapshotResult>('team.merge_queue_dry_run'),
         call<{ liveDemoGate: { ready: boolean; acknowledgedAt: string | null; actor: string | null } }>('team.get_live_demo_gate'),
+        call<SnapshotResult>('team.get_policy_status'),
       ])
       if (snapshotRes.ok && snapshotRes.result?.snapshot) {
         setSteps(snapshotRes.result.snapshot.executionSteps)
@@ -210,6 +239,16 @@ export default function TeamTracker({
       }
       if (gateRes.ok && gateRes.result?.liveDemoGate) {
         setLiveDemoGate(gateRes.result.liveDemoGate)
+      }
+      if (policyRes.ok && policyRes.result?.policy) {
+        const p = policyRes.result.policy
+        const lines = [
+          `Policy v${p.version}: ${p.ok ? 'ok' : 'blocked'}`,
+          p.missingMcpMethods.length > 0 ? `Missing MCP: ${p.missingMcpMethods.join(', ')}` : '',
+          p.missingSkills.length > 0 ? `Missing skills: ${p.missingSkills.join(', ')}` : '',
+          p.missingRules.length > 0 ? `Missing rules: ${p.missingRules.join(', ')}` : '',
+        ].filter(Boolean)
+        setPolicySummary(lines.join('\n'))
       }
       setLastUpdateAt(new Date().toISOString())
     }
@@ -388,6 +427,38 @@ export default function TeamTracker({
         ]
         setShipSummaryText(lines.join('\n'))
       }
+      if (res.ok && res.result?.verification) {
+        const v = res.result.verification
+        const lines = [
+          `Verification ${v.id}: ${v.ok ? 'passed' : 'failed'}`,
+          `Touched unit coverage: ${v.touchedCoveragePct}%`,
+          v.e2eFeatures.length > 0 ? `E2E feature evidence: ${v.e2eFeatures.join(', ')}` : 'E2E feature evidence: none',
+          ...v.gates.map((g) => `- [${g.ok ? 'ok' : 'fail'}] ${g.name}${g.retried ? ' (retried)' : ''}`),
+        ]
+        setVerificationSummary(lines.join('\n'))
+      }
+      if (res.ok && res.result?.policy) {
+        const p = res.result.policy
+        const lines = [
+          `Policy v${p.version}: ${p.ok ? 'ok' : 'blocked'}`,
+          p.missingMcpMethods.length > 0 ? `Missing MCP: ${p.missingMcpMethods.join(', ')}` : '',
+          p.missingSkills.length > 0 ? `Missing skills: ${p.missingSkills.join(', ')}` : '',
+          p.missingRules.length > 0 ? `Missing rules: ${p.missingRules.join(', ')}` : '',
+        ].filter(Boolean)
+        setPolicySummary(lines.join('\n'))
+      }
+      if (res.ok && res.result?.failureBundle) {
+        const f = res.result.failureBundle
+        const lines = [
+          `Failure bundle ${f.id}`,
+          `At: ${new Date(f.at).toLocaleString('en-GB', { hour12: false })}`,
+          `Reason: ${f.reason}`,
+          `Actor: ${f.actor}`,
+          `Stage: ${f.stage}`,
+          `Branch: ${f.branch}`,
+        ]
+        setFailureBundleSummary(lines.join('\n'))
+      }
       if (res.ok && res.result?.liveDemoGate) {
         setLiveDemoGate(res.result.liveDemoGate)
       }
@@ -413,6 +484,10 @@ export default function TeamTracker({
     if (result.squads) setSquads(result.squads)
     if (result.activeSquadId) setActiveSquadId(result.activeSquadId)
     setLastUpdateAt(new Date().toISOString())
+  }
+
+  async function runVerificationSuite() {
+    await apply('team.run_verification_suite', { feature: selectedFeature || suggested }, 'verify-suite')
   }
 
   function adjacentMergeTaskIndex(stepId: string, taskIndex: number, direction: 'up' | 'down'): number | null {
@@ -558,6 +633,13 @@ export default function TeamTracker({
               Dry Run Queue
             </button>
             <button
+              onClick={() => void runVerificationSuite()}
+              disabled={busy === 'verify-suite' || !connected}
+              className="min-h-9 rounded-md border border-border bg-bg px-3 py-2 text-[12px] text-text-secondary hover:bg-text/5 disabled:opacity-50"
+            >
+              Run Verification Suite
+            </button>
+            <button
               onClick={() => apply('team.merge_queue_ship', {}, 'merge-queue-ship')}
                 disabled={busy === 'merge-queue-ship' || !connected || needsVerification || dryRunBlocked || Boolean(repoState?.hasConflicts)}
               className="min-h-9 rounded-md border border-border bg-bg px-3 py-2 text-[12px] text-text-secondary hover:bg-text/5 disabled:opacity-50"
@@ -653,6 +735,15 @@ export default function TeamTracker({
           )}
           {shipSummaryText && (
             <pre className="mt-2 max-h-[180px] overflow-auto rounded-md border border-[#5B9A65]/35 bg-[#5B9A65]/8 p-2 text-[11px] text-[#2F6A3B]">{shipSummaryText}</pre>
+          )}
+          {verificationSummary && (
+            <pre className="mt-2 max-h-[180px] overflow-auto rounded-md border border-border bg-bg p-2 text-[11px] text-text-secondary">{verificationSummary}</pre>
+          )}
+          {policySummary && (
+            <pre className="mt-2 max-h-[180px] overflow-auto rounded-md border border-border bg-bg p-2 text-[11px] text-text-secondary">{policySummary}</pre>
+          )}
+          {failureBundleSummary && (
+            <pre className="mt-2 max-h-[180px] overflow-auto rounded-md border border-[#D95B5B]/35 bg-[#D95B5B]/8 p-2 text-[11px] text-[#8A3535]">{failureBundleSummary}</pre>
           )}
         </div>
 

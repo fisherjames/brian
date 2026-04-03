@@ -9,6 +9,7 @@ import { startWatcher } from './watcher'
 import { addGlobalListener } from './global-watcher'
 import { getBrainPathForId, getSuggestedTask, runTeamMcpCall } from './team-board-mcp'
 import { isV2Method, runV2McpCall } from './v2/mcp'
+import { captureFailureBundle } from './mission-governance'
 
 const dev = process.env.NODE_ENV === 'development'
 const port = parseInt(process.env.PORT || '3000', 10)
@@ -197,6 +198,12 @@ function classifyStage(line: string): 'planning' | 'coding' | 'verification' | '
   if (lower.includes('test') || lower.includes('verify') || lower.includes('validation')) return 'verification'
   if (lower.includes('plan') || lower.includes('todo')) return 'planning'
   return 'system'
+}
+
+function ensureObservabilityHarness(brainId: string): void {
+  const root = getBrainPathForId(brainId)
+  const dir = path.join(root, '.brian', 'observability')
+  fs.mkdirSync(dir, { recursive: true })
 }
 
 function shouldIgnoreLogLine(line: string): boolean {
@@ -447,6 +454,7 @@ app.prepare().then(() => {
 
           try {
             if (method === 'team.start_next_task') {
+              ensureObservabilityHarness(brainId)
               const gateState = runTeamMcpCall(brainId, 'team.get_live_demo_gate', {})
               if (!gateState.liveDemoGate?.ready) {
                 const blocked = {
@@ -519,6 +527,22 @@ app.prepare().then(() => {
                 ws.send(JSON.stringify({ type: 'mcp.result', id: callId, ok: true, result: { ...result, run } }))
                 ws.send(JSON.stringify({ type: 'execution_steps', data: result.snapshot.executionSteps }))
                 ws.send(JSON.stringify({ type: 'handoffs', data: result.snapshot.handoffs }))
+              }
+              const verification = runTeamMcpCall(brainId, 'team.run_verification_suite', { feature: run.label })
+              if (!verification.message.startsWith('verification_suite:passed:')) {
+                const failBundle = captureFailureBundle(getBrainPathForId(brainId), {
+                  actor: run.actor ?? 'project-operator',
+                  stage: 'verification',
+                  reason: verification.message,
+                  details: JSON.stringify(verification.verification ?? {}, null, 2),
+                  runId: verification.verification?.id,
+                  branch: runTeamMcpCall(brainId, 'team.get_repo_state', {}).repo?.branch ?? 'unknown',
+                })
+                broadcastTeamEvent(wss, brainId, `failure_bundle_captured:${failBundle.id}`, {
+                  actor: run.actor ?? 'project-operator',
+                  stage: 'blocker',
+                  kind: 'blocker',
+                })
               }
               return
             }

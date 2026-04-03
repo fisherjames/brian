@@ -3,6 +3,13 @@ import { listCodexSkills, readCodexSkill, writeCodexSkill } from '@/lib/local-da
 
 export async function GET(request: NextRequest) {
   const skillName = request.nextUrl.searchParams.get('name')?.trim() ?? ''
+  const required = request.nextUrl.searchParams.get('required')?.trim() === '1'
+  if (required) {
+    const requiredSkills = ['brian-core', 'brian-team-orchestrator', 'brian-live-demo']
+    const available = listCodexSkills()
+    const missing = requiredSkills.filter((skill) => !available.includes(skill))
+    return NextResponse.json({ requiredSkills, availableSkills: available, missing, ok: missing.length === 0 })
+  }
   if (!skillName) {
     return NextResponse.json({ skills: listCodexSkills() })
   }
