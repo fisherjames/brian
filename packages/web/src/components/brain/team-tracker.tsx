@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ArrowRight, CheckSquare, GitBranch, Pause, Play, Square } from 'lucide-react'
+import { CheckSquare, GitBranch, Pause, Play, Square } from 'lucide-react'
 import { useMcpTeam } from '@/hooks/use-mcp-team'
 
 interface ExecutionStep {
@@ -109,10 +109,6 @@ function tagged(steps: ExecutionStep[], prefix: 'BLOCKER:' | 'NEXT:' | 'MERGE:')
   return out
 }
 
-function cleanLabel(text: string, prefix: 'BLOCKER:' | 'NEXT:' | 'MERGE:' | 'VERIFY:') {
-  return text.replace(new RegExp(`^${prefix}\\s*`, 'i'), '')
-}
-
 function statusPill(status: 'working' | 'awaiting_approval' | 'blocked' | 'idle') {
   if (status === 'working') return 'bg-[#E8A830]/15 text-[#E8A830]'
   if (status === 'awaiting_approval') return 'bg-[#4A9FD9]/15 text-[#4A9FD9]'
@@ -131,6 +127,7 @@ export default function TeamTracker({
   handoffs: Handoff[]
   refreshSnapshot: () => Promise<void>
 }) {
+  const fallbackSquad = { id: 'squad-core', name: 'Core Squad', memberAgentIds: ['project-operator', 'product-lead', 'frontend-engineer', 'backend-engineer'] }
   const [steps, setSteps] = useState(executionSteps)
   const [handoffList, setHandoffList] = useState(handoffs)
   const [busy, setBusy] = useState<string | null>(null)
@@ -139,21 +136,17 @@ export default function TeamTracker({
   const [repoState, setRepoState] = useState<RepoState | null>(null)
   const [selectedFeature, setSelectedFeature] = useState('')
   const [conflictSummary, setConflictSummary] = useState('')
-  const [selectedHandoffPath, setSelectedHandoffPath] = useState('')
-  const [selectedHandoffContent, setSelectedHandoffContent] = useState('')
   const [serverSuggested, setServerSuggested] = useState('')
   const [mergePreviewText, setMergePreviewText] = useState('')
   const [mergeQueueText, setMergeQueueText] = useState('')
   const [shipSummaryText, setShipSummaryText] = useState('')
-  const [dragMerge, setDragMerge] = useState<{ stepId: string; taskIndex: number } | null>(null)
-  const [observer, setObserver] = useState<SnapshotResult['observer'] | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [hasSeenConnected, setHasSeenConnected] = useState(false)
   const [connectionGraceExpired, setConnectionGraceExpired] = useState(false)
   const [lastUpdateAt, setLastUpdateAt] = useState<string>('')
   const [squads, setSquads] = useState<Array<{ id: string; name: string; memberAgentIds: string[] }>>([])
   const [activeSquadId, setActiveSquadId] = useState('')
-  const { connected, events, call } = useMcpTeam(brainId)
+  const { connected, call } = useMcpTeam(brainId)
 
   useEffect(() => setSteps(executionSteps), [executionSteps])
   useEffect(() => setHandoffList(handoffs), [handoffs])
@@ -181,15 +174,17 @@ export default function TeamTracker({
       if (runRes.ok && runRes.result) {
         setRunState(runRes.result.run ?? null)
         setRunActive(Boolean(runRes.result.active))
-        if (runRes.result.observer) setObserver(runRes.result.observer)
       }
       if (repoRes.ok && repoRes.result?.repo) setRepoState(repoRes.result.repo)
       if (suggestionRes.ok && suggestionRes.result) setServerSuggested(suggestionRes.result.suggested ?? '')
       if (squadsRes.ok && squadsRes.result) {
-        const nextSquads = squadsRes.result.squads ?? []
-        const nextActive = squadsRes.result.activeSquadId ?? ''
+        const nextSquads = (squadsRes.result.squads ?? []).length > 0 ? (squadsRes.result.squads ?? []) : [fallbackSquad]
+        const nextActive = squadsRes.result.activeSquadId || nextSquads[0]?.id || fallbackSquad.id
         setSquads(nextSquads)
         setActiveSquadId(nextActive)
+      } else {
+        setSquads([fallbackSquad])
+        setActiveSquadId(fallbackSquad.id)
       }
       setLastUpdateAt(new Date().toISOString())
     }
@@ -207,7 +202,6 @@ export default function TeamTracker({
     return phase99.length > 0 ? phase99 : steps
   }, [steps])
 
-  const blockers = useMemo(() => tagged(teamSteps, 'BLOCKER:'), [teamSteps])
   const nextItems = useMemo(() => tagged(teamSteps, 'NEXT:'), [teamSteps])
   const mergeItems = useMemo(() => tagged(teamSteps, 'MERGE:'), [teamSteps])
   const verifiedStepIds = useMemo(() => {
@@ -263,7 +257,6 @@ export default function TeamTracker({
     })
   }, [pendingVerificationOptions])
 
-  const openBlockers = blockers.filter((item) => !item.done)
   const needsVerification = mergeItems.some((item) => !item.done && !verifiedStepIds.has(item.stepId))
   const hardBlockers = useMemo(() => {
     const items: Array<{ message: string; resolution: string }> = []
@@ -286,24 +279,6 @@ export default function TeamTracker({
     if ((runActive && runState?.status === 'awaiting_approval') || needsVerification) return 'awaiting_approval'
     return 'idle'
   }, [hardBlockers.length, needsVerification, runActive, runState?.status])
-
-  const watchlistItems = useMemo(() => openBlockers.map((item) => item.text), [openBlockers])
-
-  const personaEvents = useMemo(() => {
-    const allowed = new Set([
-      'project-operator',
-      'frontend-engineer',
-      'backend-engineer',
-      'product-lead',
-      'growth-marketing',
-      'mobile-engineer',
-      'devops-release',
-      'founder-ceo',
-      'director',
-      'tribe-head',
-    ])
-    return events.filter((event) => event.actor && allowed.has(event.actor))
-  }, [events])
 
   const currentTask = useMemo(() => {
     if (runActive && runState?.label) return runState.label
@@ -380,9 +355,6 @@ export default function TeamTracker({
       if (res.ok && typeof res.result?.suggested === 'string') {
         setServerSuggested(res.result.suggested)
       }
-      if (res.ok && res.result?.observer) {
-        setObserver(res.result.observer)
-      }
       setLastUpdateAt(new Date().toISOString())
     } finally {
       setBusy(null)
@@ -404,22 +376,6 @@ export default function TeamTracker({
     setLastUpdateAt(new Date().toISOString())
   }
 
-  async function openHandoff(path: string) {
-    setSelectedHandoffPath(path)
-    setSelectedHandoffContent('Loading handoff...')
-    try {
-      const res = await fetch(`/api/brain-file/${brainId}?path=${encodeURIComponent(path)}`)
-      if (!res.ok) {
-        setSelectedHandoffContent('Failed to load handoff.')
-        return
-      }
-      const text = await res.text()
-      setSelectedHandoffContent(text)
-    } catch {
-      setSelectedHandoffContent('Failed to load handoff.')
-    }
-  }
-
   function adjacentMergeTaskIndex(stepId: string, taskIndex: number, direction: 'up' | 'down'): number | null {
     const inStep = mergeItems.filter((item) => item.stepId === stepId).sort((a, b) => a.taskIndex - b.taskIndex)
     const currentPos = inStep.findIndex((item) => item.taskIndex === taskIndex)
@@ -432,7 +388,7 @@ export default function TeamTracker({
   return (
     <div className="h-full overflow-y-auto p-4">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-3">
-        <div className="rounded-lg border border-border bg-bg-section p-3">
+        <div className="rounded-lg border border-[#B9D9FF] bg-[#EEF6FF] p-3">
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-[11px] uppercase tracking-wide text-text-muted">Mission Control</p>
             <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${statusPill(systemStatus)}`}>{systemStatus.replace('_', ' ')}</span>
@@ -448,7 +404,7 @@ export default function TeamTracker({
                 onChange={(e) => void switchSquad(e.target.value)}
                 className="min-w-[180px] rounded-md border border-border bg-bg px-2 py-1.5 text-[12px] text-text-secondary outline-none"
               >
-                {(squads.length === 0 ? [{ id: '', name: 'No squads' }] : squads).map((sq) => (
+                {(squads.length === 0 ? [fallbackSquad] : squads).map((sq) => (
                   <option key={sq.id || 'none'} value={sq.id}>
                     {sq.name}
                   </option>
@@ -465,7 +421,7 @@ export default function TeamTracker({
           )}
           {!hasRunnableSuggestion && (
             <div className="mt-2 rounded-md border border-border/70 bg-bg p-2 text-[12px] text-text-muted">
-              No runnable next task yet. Run <code>brian plan &lt;initiative-id&gt; --squad &lt;name&gt;</code> to generate queue items, or start the discussion loop.
+              No runnable next task yet. Run <code>brian plan &lt;initiative-id&gt; --squad &lt;name&gt;</code> to generate queue items.
             </div>
           )}
           {!connected && (
@@ -479,12 +435,9 @@ export default function TeamTracker({
             </div>
           )}
 
-          <div className="mt-2 grid gap-2 sm:grid-cols-3">
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
             <div className="rounded-md border border-border/70 bg-bg px-2 py-1.5 text-[11px] text-text-secondary">
               Run: {runState && runActive ? `${runState.status} (${runState.actor ?? 'worker'})` : 'idle'}
-            </div>
-            <div className="rounded-md border border-border/70 bg-bg px-2 py-1.5 text-[11px] text-text-secondary">
-              Discussion loop: {observer?.active ? `on (ticks ${observer.ticks}, tasks ${observer.addedTasks})` : 'off'}
             </div>
             <div className="rounded-md border border-border/70 bg-bg px-2 py-1.5 text-[11px] text-text-secondary">
               Last update: {lastUpdateAt ? new Date(lastUpdateAt).toLocaleTimeString('en-GB', { hour12: false }) : 'pending'}
@@ -535,34 +488,6 @@ export default function TeamTracker({
               className="min-h-9 rounded-md border border-border bg-bg px-3 py-2 text-[12px] text-text-secondary hover:bg-text/5 disabled:opacity-50"
             >
               Cleanup Worktrees
-            </button>
-            <button
-              onClick={() => apply('team.generate_handoff', {}, 'generate-handoff')}
-              disabled={busy === 'generate-handoff' || !connected}
-              className="min-h-9 rounded-md border border-border bg-bg px-3 py-2 text-[12px] text-text-secondary hover:bg-text/5 disabled:opacity-50"
-            >
-              Generate Handoff
-            </button>
-            <button
-              onClick={() => apply('team.cleanup_worktrees', { force: true }, 'cleanup-wt-force')}
-              disabled={busy === 'cleanup-wt-force' || !connected}
-              className="min-h-9 rounded-md border border-border bg-bg px-3 py-2 text-[12px] text-text-secondary hover:bg-text/5 disabled:opacity-50"
-            >
-              Force Cleanup
-            </button>
-            <button
-              onClick={() => apply('team.observer_start', {}, 'observer-start')}
-              disabled={busy === 'observer-start' || observer?.active || !connected}
-              className="min-h-9 rounded-md border border-border bg-bg px-3 py-2 text-[12px] text-text-secondary hover:bg-text/5 disabled:opacity-50"
-            >
-              Start Discussion Loop
-            </button>
-            <button
-              onClick={() => apply('team.observer_stop', {}, 'observer-stop')}
-              disabled={busy === 'observer-stop' || !observer?.active || !connected}
-              className="min-h-9 rounded-md border border-border bg-bg px-3 py-2 text-[12px] text-text-secondary hover:bg-text/5 disabled:opacity-50"
-            >
-              Stop Discussion Loop
             </button>
           </div>
 
@@ -640,43 +565,23 @@ export default function TeamTracker({
           )}
         </div>
 
-          <div className="grid gap-3 md:grid-cols-3">
-          <div className="rounded-lg border border-border bg-bg-section p-3">
-            <p className="text-[10px] uppercase tracking-wide text-text-muted">Hard Blockers</p>
-            <div className="mt-2 flex flex-col gap-1.5">
-              {hardBlockers.map((reason, idx) => (
-                <div key={`sys-b-${idx}`} className="flex items-start gap-1.5 text-left text-[12px] text-[#D95B5B]">
-                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                  <span>{reason.message}</span>
-                </div>
-              ))}
-              {hardBlockers.length === 0 && <p className="text-[12px] text-text-muted">No hard blockers.</p>}
-            </div>
-          </div>
-
+        <div className="grid gap-3 md:grid-cols-2">
           <div className="rounded-lg border border-border bg-bg-section p-3">
             <p className="text-[10px] uppercase tracking-wide text-text-muted">Next Queue</p>
             <div className="mt-2 flex flex-col gap-1.5">
               {openNextItems.slice(0, 10).map((item, idx) => (
-                <button
-                  key={`n-${idx}`}
-                  onClick={() => apply('team.toggle_task', { stepId: item.stepId, taskIndex: item.taskIndex }, `n-${idx}`)}
-                  disabled={busy === `n-${idx}`}
-                  className="flex items-start gap-1.5 text-left text-[12px] text-text-secondary"
-                >
-                  {item.done ? <CheckSquare className="mt-0.5 h-3.5 w-3.5 shrink-0 text-leaf" /> : <Square className="mt-0.5 h-3.5 w-3.5 shrink-0" />}
-                  <ArrowRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#E8A830]" />
+                <div key={`n-${idx}`} className="rounded border border-border/70 bg-bg px-2 py-1.5 text-[12px] text-text-secondary">
                   <span>
                     {parseTaskMeta(item.text, 'feature') ?? item.text}
                     <span className="ml-1 text-text-muted">[{parseTaskMeta(item.text, 'worktree') ?? 'worktree-missing'}]</span>
                   </span>
-                </button>
+                </div>
               ))}
               {openNextItems.length === 0 && (
                 <p className="text-[12px] text-text-muted">
                   {mergeItems.length > 0
-                    ? 'Queue is consumed. Complete verification/merge on active worktrees or run observer for new work.'
-                    : 'No queued tasks. Run planning to create `NEXT:` tasks with feature/worktree metadata, or run the discussion loop.'}
+                    ? 'Queue is consumed. Complete verification/merge on active worktrees.'
+                    : 'No queued tasks. Run planning to create `NEXT:` tasks with feature/worktree metadata.'}
                 </p>
               )}
             </div>
@@ -694,20 +599,7 @@ export default function TeamTracker({
                 return (
                   <div
                     key={`m-${idx}`}
-                    draggable
-                    onDragStart={() => setDragMerge({ stepId: item.stepId, taskIndex: item.taskIndex })}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={() => {
-                      if (!dragMerge) return
-                      if (dragMerge.stepId !== item.stepId || dragMerge.taskIndex === item.taskIndex) return
-                      void apply(
-                        'team.reorder_task',
-                        { stepId: item.stepId, fromIndex: dragMerge.taskIndex, toIndex: item.taskIndex },
-                        `drag-${idx}`
-                      )
-                      setDragMerge(null)
-                    }}
-                    className="cursor-grab rounded-md border border-border/70 bg-bg p-2 active:cursor-grabbing"
+                    className="rounded-md border border-border/70 bg-bg p-2"
                   >
                     <div className="flex items-start gap-1.5 text-[12px] text-text-secondary">
                       {item.done ? <CheckSquare className="mt-0.5 h-3.5 w-3.5 shrink-0 text-leaf" /> : <Square className="mt-0.5 h-3.5 w-3.5 shrink-0" />}
@@ -762,63 +654,20 @@ export default function TeamTracker({
           </div>
         </div>
 
-        {watchlistItems.length > 0 && (
-          <div className="rounded-lg border border-border bg-bg-section p-3">
-            <p className="text-[10px] uppercase tracking-wide text-text-muted">Watchlist (Non-blocking)</p>
-            <div className="mt-2 flex flex-col gap-1.5">
-              {watchlistItems.map((item, idx) => (
-                <p key={`watch-${idx}`} className="text-[12px] text-text-muted">- {item}</p>
+        <div className="rounded-lg border border-border bg-bg-section p-3">
+          <p className="text-[10px] uppercase tracking-wide text-text-muted">Recent Handoffs</p>
+          <div className="mt-2 flex max-h-[220px] flex-col gap-1.5 overflow-y-auto">
+            {handoffList
+              .slice()
+              .sort((a, b) => b.session_number - a.session_number)
+              .slice(0, 8)
+              .map((h) => (
+                <div key={h.id} className="rounded border border-border/70 bg-bg px-2 py-1.5 text-[12px] text-text-secondary">
+                  <p className="font-medium">Session {h.session_number}</p>
+                  <p className="line-clamp-2 text-[11px] text-text-muted">{h.summary || h.file_path}</p>
+                </div>
               ))}
-            </div>
-          </div>
-        )}
-
-        <div className="grid gap-3 lg:grid-cols-2">
-          <div className="rounded-lg border border-border bg-bg-section p-3">
-            <p className="text-[10px] uppercase tracking-wide text-text-muted">Discussion</p>
-            <div className="mt-2 flex max-h-[260px] flex-col gap-1 overflow-y-auto">
-              {personaEvents.map((event, idx) => {
-                const cleaned = event.message
-                  .replace(/^\[(stdout|stderr)\]\s*/i, '')
-                  .replace(/^\+\s*/, '')
-                  .trim()
-                if (!cleaned) return null
-                if (/^[0-9a-f]{8}-[0-9a-f-]{20,}$/i.test(cleaned)) return null
-                return (
-                <p key={`evt-${idx}`} className="text-[12px] text-text-secondary">
-                  <span className="mr-1 text-text-muted">[{new Date(event.at).toLocaleTimeString('en-GB', { hour12: false })}]</span>
-                  {event.actor ? <span className="mr-1 rounded bg-text/10 px-1 py-0.5 text-[10px] text-text-muted">{event.actor}</span> : null}
-                  {event.stage ? <span className="mr-1 rounded bg-text/10 px-1 py-0.5 text-[10px] text-text-muted">{event.stage}</span> : null}
-                  <span className="mr-1 text-text-muted">•</span>
-                  <span>{cleaned}</span>
-                </p>
-                )
-              })}
-              {personaEvents.length === 0 && <p className="text-[12px] text-text-muted">No persona/main-agent output yet.</p>}
-            </div>
-          </div>
-
-          <div className="rounded-lg border border-border bg-bg-section p-3">
-            <p className="text-[10px] uppercase tracking-wide text-text-muted">Handoffs</p>
-            <div className="mt-2 grid gap-2 lg:grid-cols-2">
-              <div className="max-h-[260px] overflow-y-auto">
-                {handoffList.slice().sort((a, b) => b.session_number - a.session_number).slice(0, 12).map((h) => (
-                  <button
-                    key={h.id}
-                    onClick={() => void openHandoff(h.file_path)}
-                    className="mb-1.5 w-full rounded border border-border/70 bg-bg px-2 py-1.5 text-left text-[12px] text-text-secondary hover:bg-text/5"
-                  >
-                    <p className="font-medium">Session {h.session_number}</p>
-                    <p className="line-clamp-2 text-[11px] text-text-muted">{h.summary || h.file_path}</p>
-                  </button>
-                ))}
-                {handoffList.length === 0 && <p className="text-[12px] text-text-muted">No handoffs yet.</p>}
-              </div>
-              <div className="min-h-[220px] rounded border border-border/70 bg-bg p-2">
-                <p className="mb-1 text-[11px] text-text-muted">{selectedHandoffPath || 'Select a handoff'}</p>
-                <pre className="max-h-[230px] overflow-auto whitespace-pre-wrap text-[11px] text-text-secondary">{selectedHandoffContent || 'Handoff content will render here.'}</pre>
-              </div>
-            </div>
+            {handoffList.length === 0 && <p className="text-[12px] text-text-muted">No handoffs yet.</p>}
           </div>
         </div>
       </div>

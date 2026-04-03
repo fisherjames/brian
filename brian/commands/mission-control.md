@@ -11,4 +11,4 @@
 - Approve/Deny only when the card shows an explicit question.
 - Trigger next execution work only when hard blockers are clear.
 - Merge only after verification and conflict-free preview.
-- Keep live feed actor-scoped to Brian personas.
+- Every Mission Control action must map to a concrete MCP call and update the markdown-backed workflow state.

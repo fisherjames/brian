@@ -1034,6 +1034,9 @@ export function runV2McpCall(brainId: string, method: string, params: Record<str
       ?? models.discussions.find((item) => item.initiativeId === initiativeId)
       ?? null
     if (!discussion) throw new Error(`discussion_not_found_for_initiative:${initiativeId}`)
+    if (discussion.layer !== 'director' || discussion.status !== 'open') {
+      throw new Error(`proposal_requires_open_director_discussion:${initiativeId}`)
+    }
 
     const options = parseDecisionOptions(params.options)
     const normalizedOptions = options.length >= 2
@@ -1479,16 +1482,22 @@ export function runV2McpCall(brainId: string, method: string, params: Record<str
       }
     })()
     const selectedOption = typeof params.selectedOption === 'string' ? params.selectedOption.trim() : ''
+    const actorId = typeof params.actor === 'string' ? params.actor : 'founder-ceo'
+    const feedback = typeof params.feedback === 'string' ? params.feedback.trim() : ''
     // Keep strict format checks on decision creation, but allow resolving
     // older records that may not follow yes/no phrasing.
     if (mode === 'multi_option' && status === 'approved') {
       if (!selectedOption) throw new Error(`decision_option_required:${decisionId}`)
       if (!options.includes(selectedOption)) throw new Error(`decision_option_invalid:${decisionId}`)
     }
+    if (status === 'rejected' && !feedback) {
+      throw new Error(`decision_feedback_required:${decisionId}`)
+    }
     updateFrontmatter(decisionPath, {
       status,
       outcome: status === 'approved' ? 'confirmed' : 'denied',
       selected_option: mode === 'multi_option' && status === 'approved' ? selectedOption : '',
+      rejection_feedback: status === 'rejected' ? feedback : '',
       updated_at: new Date().toISOString(),
     })
     const verb = status === 'approved' ? 'confirmed' : 'denied'
@@ -1496,9 +1505,96 @@ export function runV2McpCall(brainId: string, method: string, params: Record<str
     appendSectionLine(
       decisionPath,
       'Outcome Log',
-      `${new Date().toISOString()} · ${typeof params.actor === 'string' ? params.actor : 'founder-ceo'} ${verb} decision question: "${question}"${selectionSuffix}`
+      `${new Date().toISOString()} · ${actorId} ${verb} decision question: "${question}"${selectionSuffix}${status === 'rejected' ? ` · feedback: ${feedback}` : ''}`
     )
-    const event = lifecycleEvent(brainId, 'decision.record', {
+    if (status === 'rejected') {
+      const initiativeId = String(current.initiative_id || '').trim()
+      const initiative = initiativeId ? readInitiativeMeta(brain.path, initiativeId) : null
+      if (initiativeId && initiative) {
+        upsertInitiative(brain.path, {
+          id: initiativeId,
+          title: initiative.title,
+          stage: 'leadership_discussion',
+          summary: initiative.summary,
+          actor: actorId,
+          note: `CEO rejected proposal PDF and reopened director discussion: ${feedback}`,
+        })
+      }
+
+      const explicitDiscussionId = String(current.discussion_id || '').trim()
+      let discussionPath = explicitDiscussionId ? findRecordPath(brain.path, 'discussions', explicitDiscussionId) : null
+      if (!discussionPath) {
+        const rel = String(current.discussion_path || '').trim()
+        if (rel) {
+          const abs = path.join(brain.path, rel)
+          if (fs.existsSync(abs)) discussionPath = abs
+        }
+      }
+      if (!discussionPath && initiativeId) {
+        const discussionTitle = initiative?.title
+          ? `${initiative.title} director discussion`
+          : 'Director discussion'
+        const reopenQuestion =
+          normalizeQuestion(feedback)
+          || `What proposal changes are required before CEO can approve "${initiative?.title || decisionId}"?`
+        const participants = discussionPersonas(brain.path, 'director', 'director')
+          .map((id) => {
+            const p = persona(id)
+            return `${p.name} (${p.id}) · ${p.role} · voice=${p.voice} · concern=${p.concern}`
+          })
+        const reopened = createRecord(brain.path, 'discussions', discussionTitle, {
+          layer: 'director',
+          status: 'open',
+          paused_by_escalation: 'false',
+          escalation_state: 'none',
+          initiative_id: initiativeId,
+          unresolved_questions: '1',
+          outcome: 'pending',
+          actor: 'director',
+          initial_question: reopenQuestion,
+          open_questions_json: JSON.stringify([reopenQuestion]),
+          outcomes_json: JSON.stringify([]),
+          personas_json: JSON.stringify(participants),
+        })
+        discussionPath = findRecordPath(brain.path, 'discussions', reopened.id)
+        updateFrontmatter(decisionPath, {
+          discussion_id: reopened.id,
+          discussion_path: path.join('brian', 'discussions', `${reopened.id}.md`),
+          updated_at: new Date().toISOString(),
+        })
+      }
+
+      if (discussionPath) {
+        const discussionCurrent = parseFrontmatter(fs.readFileSync(discussionPath, 'utf8'))
+        const currentQuestions = parseStringJsonArray(discussionCurrent.open_questions_json)
+        const reopenQuestion =
+          normalizeQuestion(feedback)
+          || `What proposal changes are required before CEO can approve "${initiative?.title || decisionId}"?`
+        const nextQuestions = currentQuestions.includes(reopenQuestion)
+          ? currentQuestions
+          : [...currentQuestions, reopenQuestion]
+        updateFrontmatter(discussionPath, {
+          layer: 'director',
+          status: 'open',
+          paused_by_escalation: 'false',
+          escalation_state: 'none',
+          unresolved_questions: String(nextQuestions.length),
+          open_questions_json: JSON.stringify(nextQuestions),
+          updated_at: new Date().toISOString(),
+        })
+        appendThreadMessage(
+          discussionPath,
+          actorId,
+          `CEO rejected proposal PDF: ${feedback}. Resume director discussion and return a revised proposal packet.`
+        )
+        appendSectionLine(
+          discussionPath,
+          'Outcome Log',
+          `${new Date().toISOString()} · ${actorId} reopened director discussion after CEO rejection`
+        )
+      }
+    }
+    const event = lifecycleEvent(brainId, 'decision.resolve', {
       ...params,
       decisionId,
       message: `decision_resolved:${status}`,

@@ -6,13 +6,15 @@ Brian is a markdown-first company operating system for software delivery.
 Brian runs work through an explicit organizational ladder. Decisions are resolved at the lowest authorized layer; CEO only sees exceptions.
 
 ## Canonical Workflow
-`intent -> proposal -> leadership discussion -> director decision -> tribe shaping -> squad planning -> execution -> verification -> merge -> briefing`
+`intent -> director discussion -> director decision proposal -> CEO reviews proposal PDF -> CEO approves proposal PDF -> tribe shaping -> squad planning -> execution -> verification -> merge -> briefing`
 
 ## Planning Contract (Explicit)
 - CEO creates initiative.
 - Directors return a proposal package as downloadable PDF.
-- CEO receives explicit decision in CEO View and accepts/rejects.
-- After acceptance, tribe shapes; squads then plan and execute.
+- CEO reviews proposal PDF in CEO View and either approves or rejects with explicit feedback.
+- Rejection must reopen director discussion before a revised proposal can be submitted.
+- After CEO approval, tribe shapes; squads then plan and execute.
+- Rejection loop (strict): `CEO rejects proposal PDF -> director discussion -> revised director decision proposal -> CEO reviews proposal PDF`.
 - `brian plan <initiative-id> --squad "<name>"` starts squad planning discussion and generates a question set.
 - Discussion chain is fixed:
   - Team Lead asks Product Owner first.
@@ -38,6 +40,8 @@ Brian runs work through an explicit organizational ladder. Decisions are resolve
 - `Mission Control`: squad execution, verification, merge gates
 - `Graph + Notes`: evidence graph and note navigation
 - `Agents + Workflow`: editable personas, workflow rules, and skills
+
+Every Mission Control action is backed by a real MCP call so the same workflow surface can be consumed by both UI operators and future executive-agent automation.
 
 ## Storage Model
 - Repo memory: `brian/`

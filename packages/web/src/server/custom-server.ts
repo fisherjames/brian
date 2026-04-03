@@ -72,14 +72,6 @@ type TeamSnapshot = {
   handoffs: Array<{ id: string; session_number?: number; summary?: string; file_path?: string }>
 }
 
-type TeamObserver = {
-  brainId: string
-  startedAt: string
-  ticks: number
-  addedTasks: number
-  timer: NodeJS.Timeout
-}
-
 type SquadConfig = {
   id: string
   name: string
@@ -88,7 +80,6 @@ type SquadConfig = {
 
 const activeRuns = new Map<string, BrainRun>()
 const activeChildren = new Map<string, ChildProcess>()
-const teamObservers = new Map<string, TeamObserver>()
 
 function verifyNextBuildArtifacts(root: string): { ok: true } | { ok: false; missing: string[] } {
   const required = ['.next/build-manifest.json', '.next/server/middleware-manifest.json']
@@ -277,152 +268,6 @@ function broadcastTeamEvent(
   wss.clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) client.send(payload)
   })
-}
-
-function isFallbackSuggestion(text: string): boolean {
-  return /^no suggestion available$/i.test(text.trim()) || /^no pending suggestion$/i.test(text.trim())
-}
-
-function findObserverTargetStep(snapshot: TeamSnapshot): string | null {
-  const steps = snapshot.executionSteps
-  const teamSteps = steps.filter((step) => step.phase_number === 99)
-  const source = teamSteps.length > 0 ? teamSteps : steps
-  const inProgress = source.find((step) => step.status === 'in_progress')
-  if (inProgress) return inProgress.id
-  const notStarted = source.find((step) => step.status === 'not_started')
-  if (notStarted) return notStarted.id
-  return source[source.length - 1]?.id ?? null
-}
-
-function hasTaskWithPrefix(snapshot: TeamSnapshot, prefix: 'NEXT:' | 'BLOCKER:' | 'MERGE:' | 'VERIFY:'): boolean {
-  return snapshot.executionSteps.some((step) =>
-    (step.tasks_json ?? []).some((task) => !task.done && task.text.toUpperCase().startsWith(prefix))
-  )
-}
-
-function hasTaskText(snapshot: TeamSnapshot, fullText: string): boolean {
-  const normalized = fullText.trim().toLowerCase()
-  return snapshot.executionSteps.some((step) =>
-    (step.tasks_json ?? []).some((task) => task.text.trim().toLowerCase() === normalized)
-  )
-}
-
-function collectObserverIssues(
-  snapshot: TeamSnapshot,
-  repo: {
-    hasConflicts: boolean
-    conflictFiles: string[]
-    canStartNextWork: boolean
-    unresolvedWorktrees: string[]
-  },
-  suggested: string
-): Array<{ prefix: 'NEXT:' | 'BLOCKER:'; text: string }> {
-  const issues: Array<{ prefix: 'NEXT:' | 'BLOCKER:'; text: string }> = []
-
-  if (!repo.canStartNextWork && repo.unresolvedWorktrees.length > 0) {
-    issues.push({
-      prefix: 'BLOCKER:',
-      text: `Resolve or clean ${repo.unresolvedWorktrees.length} unresolved worktrees before starting next work.`,
-    })
-  }
-  if (repo.hasConflicts) {
-    issues.push({
-      prefix: 'BLOCKER:',
-      text: `Resolve merge conflicts in ${repo.conflictFiles.length} file(s) before queue merge can continue.`,
-    })
-  }
-
-  const hasOpenNext = hasTaskWithPrefix(snapshot, 'NEXT:')
-  if (!hasOpenNext) {
-    const trimmed = suggested.trim()
-    const source = trimmed.length > 0 && !isFallbackSuggestion(trimmed) ? trimmed : 'mission control reliability'
-    const lanes: Array<{ lane: string; title: string }> = [
-      { lane: 'incremental', title: `Incremental: ${source}` },
-      { lane: 'dream_feature', title: `Dream feature: autonomous ${source} assistant` },
-      { lane: 'refactor', title: `Refactor: simplify and harden ${source} workflow` },
-    ]
-    for (const lane of lanes) {
-      const slug = `${lane.lane}-${lane.title}`
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '')
-        .slice(0, 42) || `queue-${lane.lane}`
-      issues.push({
-        prefix: 'NEXT:',
-        text: `feature="${lane.title}" lane=${lane.lane} worktree=feature/${slug} image=pending breaking=none`,
-      })
-    }
-  }
-
-  const mergeWithoutMetadata = snapshot.executionSteps.some((step) =>
-    (step.tasks_json ?? []).some(
-      (task) =>
-        !task.done &&
-        task.text.toUpperCase().startsWith('MERGE:') &&
-        !/(?:branch|worktree)\s*=\s*[^\s]+(?:\s*->\s*[^\s]+)?/i.test(task.text)
-    )
-  )
-  if (mergeWithoutMetadata) {
-    issues.push({
-      prefix: 'BLOCKER:',
-      text: 'MERGE item missing branch metadata. Use: MERGE: branch=<source> -> <target>.',
-    })
-  }
-
-  return issues
-}
-
-function observerStateForBrain(brainId: string) {
-  const observer = teamObservers.get(brainId)
-  if (!observer) return { active: false, ticks: 0, addedTasks: 0, startedAt: null as string | null }
-  return {
-    active: true,
-    ticks: observer.ticks,
-    addedTasks: observer.addedTasks,
-    startedAt: observer.startedAt,
-  }
-}
-
-function runObserverTick(wss: WebSocketServer, brainId: string): { added: number; totalIssues: number } {
-  const observer = teamObservers.get(brainId)
-  if (!observer) return { added: 0, totalIssues: 0 }
-  observer.ticks += 1
-
-  const snapshotRes = runTeamMcpCall(brainId, 'team.get_snapshot', {})
-  const repoRes = runTeamMcpCall(brainId, 'team.get_repo_state', {})
-  const suggestedRes = runTeamMcpCall(brainId, 'team.get_suggested', {})
-  const snapshot = snapshotRes.snapshot as TeamSnapshot
-  const repo = repoRes.repo
-  const suggested = typeof suggestedRes.suggested === 'string' ? suggestedRes.suggested : ''
-  if (!repo) return { added: 0, totalIssues: 0 }
-
-  const targetStepId = findObserverTargetStep(snapshot)
-  if (!targetStepId) return { added: 0, totalIssues: 0 }
-
-  const issues = collectObserverIssues(snapshot, repo, suggested)
-  let added = 0
-
-  for (const issue of issues) {
-    const full = `${issue.prefix} ${issue.text}`.trim()
-    if (hasTaskText(snapshot, full)) continue
-    runTeamMcpCall(brainId, 'team.add_task', { stepId: targetStepId, prefix: issue.prefix, text: issue.text })
-    added += 1
-    observer.addedTasks += 1
-    broadcastTeamEvent(wss, brainId, `observer_task_added:${issue.prefix} ${issue.text}`, {
-      actor: 'project-operator',
-      stage: issue.prefix === 'BLOCKER:' ? 'blocker' : 'planning',
-      kind: issue.prefix === 'BLOCKER:' ? 'blocker' : 'status',
-    })
-  }
-
-  if (issues.length > 0) {
-    broadcastTeamEvent(wss, brainId, `observer_tick:issues=${issues.length}:added=${added}`, {
-      actor: 'project-operator',
-      stage: 'system',
-      kind: 'status',
-    })
-  }
-  return { added, totalIssues: issues.length }
 }
 
 function startCodexRunForSuggestion(
@@ -673,65 +518,8 @@ app.prepare().then(() => {
                   result: {
                     run,
                     active,
-                    observer: observerStateForBrain(brainId),
-                    workflowAutopilot: runV2McpCall(brainId, 'workflow.autopilot.state', {}).autopilot,
                   },
                 }))
-              }
-              return
-            }
-
-            if (method === 'team.observer_state') {
-              if (ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ type: 'mcp.result', id: callId, ok: true, result: { observer: observerStateForBrain(brainId) } }))
-              }
-              return
-            }
-
-            if (method === 'team.observer_start') {
-              const existing = teamObservers.get(brainId)
-              if (existing) {
-                if (ws.readyState === WebSocket.OPEN) {
-                  ws.send(JSON.stringify({ type: 'mcp.result', id: callId, ok: true, result: { message: 'observer_already_running', observer: observerStateForBrain(brainId) } }))
-                }
-                return
-              }
-              const timer = setInterval(() => {
-                try {
-                  runObserverTick(wss, brainId)
-                } catch (error) {
-                  broadcastTeamEvent(wss, brainId, `observer_tick_failed:${error instanceof Error ? error.message : 'unknown_error'}`, {
-                    actor: 'project-operator',
-                    stage: 'blocker',
-                    kind: 'blocker',
-                  })
-                }
-              }, 5000)
-              const observer: TeamObserver = {
-                brainId,
-                startedAt: new Date().toISOString(),
-                ticks: 0,
-                addedTasks: 0,
-                timer,
-              }
-              teamObservers.set(brainId, observer)
-              void runObserverTick(wss, brainId)
-              broadcastTeamEvent(wss, brainId, 'observer_started', { actor: 'project-operator', stage: 'system', kind: 'status' })
-              if (ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ type: 'mcp.result', id: callId, ok: true, result: { message: 'observer_started', observer: observerStateForBrain(brainId) } }))
-              }
-              return
-            }
-
-            if (method === 'team.observer_stop') {
-              const observer = teamObservers.get(brainId)
-              if (observer) {
-                clearInterval(observer.timer)
-                teamObservers.delete(brainId)
-                broadcastTeamEvent(wss, brainId, 'observer_stopped', { actor: 'project-operator', stage: 'system', kind: 'status' })
-              }
-              if (ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ type: 'mcp.result', id: callId, ok: true, result: { message: 'observer_stopped', observer: observerStateForBrain(brainId) } }))
               }
               return
             }
@@ -756,49 +544,6 @@ app.prepare().then(() => {
                 stage: 'blocker',
                 kind: 'blocker',
               })
-              return
-            }
-
-            if (method === 'team.generate_handoff') {
-              const now = new Date().toISOString()
-              const existingRun = activeRuns.get(brainId)
-              const fallbackSuggestion = getSuggestedTask(brainId)?.label ?? 'Manual mission checkpoint'
-              const syntheticRun: BrainRun = {
-                id: `manual-${Date.now()}`,
-                brainId,
-                status: existingRun?.status === 'blocked' ? 'blocked' : 'completed',
-                startedAt: existingRun?.startedAt ?? now,
-                endedAt: now,
-                label: existingRun?.label ?? fallbackSuggestion,
-                actor: existingRun?.actor ?? 'project-operator',
-                blockerReason: existingRun?.blockerReason,
-              }
-              const handoffPath = createAutoHandoff(brainId, syntheticRun)
-              const snapshot = runTeamMcpCall(brainId, 'team.get_snapshot', {})
-
-              if (handoffPath) {
-                broadcastTeamEvent(wss, brainId, `handoff_created:${handoffPath}`, {
-                  actor: 'project-operator',
-                  stage: 'verification',
-                  kind: 'status',
-                  refs: [handoffPath],
-                })
-              }
-
-              if (ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({
-                  type: 'mcp.result',
-                  id: callId,
-                  ok: true,
-                  result: {
-                    message: handoffPath ? `handoff_created:${handoffPath}` : 'handoff_not_created',
-                    handoffPath,
-                    snapshot: snapshot.snapshot,
-                  },
-                }))
-                ws.send(JSON.stringify({ type: 'execution_steps', data: snapshot.snapshot.executionSteps }))
-                ws.send(JSON.stringify({ type: 'handoffs', data: snapshot.snapshot.handoffs }))
-              }
               return
             }
 
@@ -886,8 +631,6 @@ app.prepare().then(() => {
   const shutdown = () => {
     console.log('\n> Shutting down...')
     wss.clients.forEach((client) => client.close())
-    for (const observer of teamObservers.values()) clearInterval(observer.timer)
-    teamObservers.clear()
     clientWatchers.forEach(({ close }) => close())
     globalCleanups.forEach((cleanup) => cleanup())
     server.close(() => process.exit(0))

@@ -6,7 +6,7 @@
 Brian is a delegated company OS for software delivery. Decisions are made at the lowest authorized level with escalating context. CEO intervenes only by exception.
 
 ## Workflow Contract
-`intent -> proposal -> leadership discussion -> director decision -> tribe shaping -> squad planning -> execution -> verification -> merge -> briefing`
+`intent -> director discussion -> director decision proposal -> CEO reviews proposal PDF -> CEO approves proposal PDF -> tribe shaping -> squad planning -> execution -> verification -> merge -> briefing`
 
 ## Decision Ladder
 - squad -> tribe -> director -> ceo

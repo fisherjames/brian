@@ -162,7 +162,22 @@ export default function CeoOverview({
     setBusy(`${status}-${decisionId}`)
     setError('')
     try {
-      const resolved = await call('decision.resolve', { decisionId, status, actor: 'founder-ceo' })
+      let feedback = ''
+      if (status === 'rejected') {
+        const captured = window.prompt('Provide CEO feedback to reopen director discussion', '')
+        if (captured === null) {
+          setBusy(null)
+          return
+        }
+        feedback = captured.trim()
+        if (!feedback) throw new Error('feedback_required_for_rejection')
+      }
+      const resolved = await call('decision.resolve', {
+        decisionId,
+        status,
+        actor: 'founder-ceo',
+        ...(status === 'rejected' ? { feedback } : {}),
+      })
       if (!resolved.ok) throw new Error(resolved.error || 'decision_resolve_failed')
       if (status === 'approved' && initiativeId) {
         const shaped = await call('initiative.shape', {

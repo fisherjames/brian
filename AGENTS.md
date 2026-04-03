@@ -3,7 +3,7 @@
 Brian is a delegated company operating system in markdown.
 
 ## Single Lifecycle
-- intent -> proposal -> leadership discussion -> director decision -> tribe shaping -> squad planning -> execution -> verification -> merge -> briefing
+- intent -> director discussion -> director decision proposal -> CEO reviews proposal PDF -> CEO approves proposal PDF -> tribe shaping -> squad planning -> execution -> verification -> merge -> briefing
 - Every stage must leave written evidence in `brian/`.
 
 ## Decision Authority
@@ -19,10 +19,11 @@ Brian is a delegated company operating system in markdown.
 - Product Owner resolves within authority/context and queries up-chain only for unresolved questions.
 - Planning pauses only if escalation reaches CEO.
 - If CEO escalation is not required, planning moves directly to execution.
+- If CEO rejects a proposal PDF, director discussion must reopen with explicit feedback before a revised proposal is submitted.
 
 ## Mission Contract
-- `brian mission <initiative-id> --squad <name>` is execution setup only.
-- Mission outputs worktree-mapped `NEXT` + `MERGE` queue entries and merge order.
+- `brian mission <initiative-id> --squad <name>` runs real implementation work inside workflow guardrails.
+- Mission keeps worktree-mapped `NEXT` + `MERGE` queue entries as the canonical UI control surface for delivery.
 - Merge remains gated by human verification and conflict checks.
 - Final release action is Mission Control **Ship to Main** (merge queue + push to `origin/main` when all gates pass).
 

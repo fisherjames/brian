@@ -1552,7 +1552,7 @@ ${hasCommands ? '- [[commands]] - repeatable Codex start, planning, note-sync, a
 ${hasCommands ? '- Open [[commands]] and the relevant role note in [[agents]] when using the richer Codex workflow layer.\n' : ''}- Prefer small, verifiable edits over speculative rewrites.
 
 ## Workflow Contract
-- intent -> proposal -> leadership discussion -> director decision -> tribe shaping -> squad planning -> execution -> verification -> merge -> briefing
+- intent -> director discussion -> director decision proposal -> CEO reviews proposal PDF -> CEO approves proposal PDF -> tribe shaping -> squad planning -> execution -> verification -> merge -> briefing
 - no execution without a context packet
 - no unresolved discussion without an escalation record
 - every interaction must emit one of: answer | decision | task | risk | escalation
@@ -2204,7 +2204,7 @@ function runDoctrineLint(brainRoot: string): { ok: boolean; issues: string[] } {
   const discussionsDir = path.join(brainRoot, 'brian', 'discussions')
   const decisionsDir = path.join(brainRoot, 'brian', 'decisions')
 
-  const pipelineContract = 'intent -> proposal -> leadership discussion -> director decision -> tribe shaping -> squad planning -> execution -> verification -> merge -> briefing'
+  const pipelineContract = 'intent -> director discussion -> director decision proposal -> CEO reviews proposal PDF -> CEO approves proposal PDF -> tribe shaping -> squad planning -> execution -> verification -> merge -> briefing'
   const agentsContent = fs.existsSync(agentsPath) ? fs.readFileSync(agentsPath, 'utf8') : ''
   const constitutionContent = fs.existsSync(constitutionPath) ? fs.readFileSync(constitutionPath, 'utf8') : ''
 
